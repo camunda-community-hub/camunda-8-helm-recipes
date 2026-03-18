@@ -18,8 +18,8 @@ CAMUNDA_HELM_CHART_VERSION ?= 14.0.0-alpha3
 CAMUNDA_VERSION ?= 8.9.0-alpha3
 
 CAMUNDA_HELM_VALUES ?= \
-  $(root)/camunda-values.yaml.d/8.9/disable-all.yaml \
-  $(root)/camunda-values.yaml.d/8.9/orchestration-rdbms-postgres.yaml \
+  $(root)/camunda-values.yaml.d/disable-all.yaml \
+  $(root)/camunda-values.yaml.d/orchestration-rdbms-postgres.yaml \
   ./my-camunda-values.yaml
 
 DEFAULT_PASSWORD ?= demo

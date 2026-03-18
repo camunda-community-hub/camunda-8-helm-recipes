@@ -12,10 +12,10 @@ CAMUNDA_HELM_CHART_VERSION ?= 14.0.0-alpha4
 CAMUNDA_VERSION ?= 8.9.0-alpha4
 
 CAMUNDA_HELM_VALUES ?= \
-  $(root)/camunda-values.yaml.d/8.9/disable-all.yaml \
-  $(root)/camunda-values.yaml.d/8.9/enable-elasticsearch.yaml \
-  $(root)/camunda-values.yaml.d/8.9/enable-ingress-nginx.yaml \
-  $(root)/camunda-values.yaml.d/8.9/orchestration-elasticsearch.yaml \
+  $(root)/camunda-values.yaml.d/disable-all.yaml \
+  $(root)/camunda-values.yaml.d/enable-elasticsearch.yaml \
+  $(root)/camunda-values.yaml.d/enable-ingress-nginx.yaml \
+  $(root)/camunda-values.yaml.d/orchestration-elasticsearch.yaml \
   ./my-camunda-values.yaml
 
 DEFAULT_PASSWORD ?= demo

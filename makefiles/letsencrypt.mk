@@ -41,6 +41,9 @@ annotate-remove-grpc-ingress-tls:
 annotate-grpc-ingress-tls: annotate-remove-grpc-ingress-tls
 	kubectl -n $(CAMUNDA_NAMESPACE) annotate ingress $(CAMUNDA_INGRESS_GRPC_NAME) cert-manager.io/cluster-issuer=letsencrypt
 
+.PHONY: annotate-ingress-tls
+annotate-ingress-tls: annotate-grpc-ingress-tls annotate-http-ingress-tls
+
 .PHONY: annotate-letsencrypt-stage
 annotate-letsencrypt-stage: annotate-remove-ingress-tls
 	kubectl -n $(CAMUNDA_NAMESPACE) annotate ingress $(CAMUNDA_INGRESS_NAME) cert-manager.io/cluster-issuer=letsencrypt-stage

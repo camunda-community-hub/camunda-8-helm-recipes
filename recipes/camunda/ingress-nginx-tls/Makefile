@@ -1,8 +1,8 @@
 # Determine the root directory
 ifeq ($(OS),Windows_NT)
-    root ?= $(CURDIR)/../../../..
+    root ?= $(CURDIR)/../../..
 else
-    root ?= $(shell pwd)/../../../..
+    root ?= $(shell pwd)/../../..
 endif
 
 # Create a config.mk file in the root directory of this project to override defaults included below
