@@ -16,7 +16,7 @@ CAMUNDA_HELM_VALUES ?= \
   $(root)/camunda-values.yaml.d/enable-elasticsearch.yaml \
   $(root)/camunda-values.yaml.d/enable-ingress-nginx.yaml \
   $(root)/camunda-values.yaml.d/enable-metrics.yaml \
-  $(root)/camunda-values.yaml.d/enable-connectors.yaml \
+  $(root)/camunda-values.yaml.d/connectors-enabled.yaml \
   $(root)/camunda-values.yaml.d/orchestration-elasticsearch.yaml \
   ./my-camunda-values.yaml
 

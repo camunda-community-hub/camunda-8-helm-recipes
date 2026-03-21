@@ -1,4 +1,5 @@
 connectors:
+  enabled: true
   security:
     authentication:
       method: oidc

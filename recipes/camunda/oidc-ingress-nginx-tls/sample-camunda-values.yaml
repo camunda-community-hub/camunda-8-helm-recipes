@@ -1,9 +1,89 @@
+global:
+  ingress:
+    enabled: true
+    className: nginx
+    host: "dave01.gke.c8sm.com"
+    tls:
+      enabled: true
+      secretName: "tls-secret"
+  security:
+    authentication:
+      method: oidc
+  identity:
+    auth:
+      enabled: true
+      publicIssuerUrl: https://dave01.gke.c8sm.com/auth/realms/camunda-platform
+      issuerBackendUrl: http://camunda-keycloak/auth/realms/camunda-platform
+      authUrl: https://dave01.gke.c8sm.com/auth/realms/camunda-platform/protocol/openid-connect/auth
+      tokenUrl: http://camunda-keycloak/auth/realms/camunda-platform/protocol/openid-connect/token
+      jwksUrl: http://camunda-keycloak/auth/realms/camunda-platform/protocol/openid-connect/certs
+      identity:
+        redirectUrl: https://dave01.gke.c8sm.com/management
+      # if optimize is disabled, then this shouldn't be required,
+      # but this is a known issue that, currently, identity requires this even if optimize is disabled.
+      optimize:
+        secret:
+          existingSecret: camunda-credentials
+          existingSecretKey: identity-optimize-client-token
+      webModeler:
+        redirectUrl: https://dave01.gke.c8sm.com/modeler
+      orchestration:
+        secret:
+          existingSecret: camunda-credentials
+          existingSecretKey: identity-orchestration-client-token
+        redirectUrl: https://dave01.gke.c8sm.com/orchestration
+    # This defines how Identity authenticates to Keycloak admin API
+    # Identity will connect to Keycloak the first time it boots and create the camunda-platform realm
+    keycloak:
+      url:
+        protocol: http
+        host: camunda-keycloak
+        port: 80
+      contextPath: /auth
+      realm: /realms/camunda-platform
+      auth:
+        adminUser: admin
+        existingSecret: "camunda-credentials"
+        existingSecretKey: "identity-keycloak-admin-password"
+  elasticsearch:
+    enabled: true
 identity:
-  enabled: false
+  enabled: true
+  contextPath: /management
+  fullURL: https://dave01.gke.c8sm.com/management
+  firstUser:
+    secret:
+      existingSecret: "camunda-credentials"
+      existingSecretKey: "identity-first-user-password"
+  env:
+    - name: KEYCLOAK_REALM
+      value: camunda-platform
+  # Use internally provisioned postgresql database for identity
+  externalDatabase:
+    enabled: false
 identityPostgresql:
-  enabled: false
+  enabled: true
+  auth:
+    username: identity
+    database: identity
+    existingSecret: camunda-credentials
+    secretKeys:
+      adminPasswordKey: identity-postgresql-admin-password
+      userPasswordKey: identity-postgresql-user-password
+# Keycloak will be installed and will use internally provisioned postgresql database
 identityKeycloak:
-  enabled: false
+  enabled: true
+  # This defines the admin user and password for Keycloak. Keycloak will create this user during first start
+  auth:
+    adminUser: admin
+    existingSecret: camunda-credentials
+    passwordSecretKey: identity-keycloak-admin-password
+  postgresql:
+    auth:
+      existingSecret: camunda-credentials
+      secretKeys:
+        adminPasswordKey: identity-postgresql-admin-password
+        userPasswordKey: identity-postgresql-user-password
 console:
   enabled: false
 webModeler:
@@ -11,17 +91,24 @@ webModeler:
 webModelerPostgresql:
   enabled: false
 connectors:
-  enabled: true
+  enabled: false
+  security:
+    authentication:
+      method: oidc
+      oidc:
+        secret:
+          existingSecret: camunda-credentials
+          existingSecretKey: identity-connectors-client-token
 orchestration:
   enabled: true
   gateway:
     grpc:
       enabled: true
-  contextPath: "/"
+  contextPath: "/orchestration"
   ingress:
     grpc:
       enabled: true
-      host: "grpc.dave02.gke.c8sm.com"
+      host: "grpc.dave01.gke.c8sm.com"
       path: "/"
       tls:
         enabled: true
@@ -33,15 +120,5 @@ optimize:
   enabled: false
 elasticsearch:
   enabled: true
-global:
-  ingress:
-    enabled: true
-    className: nginx
-    host: "dave02.gke.c8sm.com"
-    tls:
-      enabled: true
-      secretName: "tls-secret"
-  elasticsearch:
-    enabled: true
 prometheusServiceMonitor:
   enabled: true
