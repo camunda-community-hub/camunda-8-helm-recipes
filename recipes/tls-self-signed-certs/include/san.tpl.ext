@@ -1,0 +1,16 @@
+authorityKeyIdentifier=keyid,issuer
+basicConstraints=CA:FALSE
+keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = grpc.HOST_NAME
+DNS.2 = RELEASE-keycloak.NAMESPACE.svc.cluster.local
+DNS.3 = RELEASE-identity.NAMESPACE.svc.cluster.local
+DNS.4 = RELEASE-web-modeler-restapi.NAMESPACE.svc.cluster.local
+DNS.5 = RELEASE-web-modeler-webapp.NAMESPACE.svc.cluster.local
+DNS.6 = RELEASE-elasticsearch.NAMESPACE.svc.cluster.local
+DNS.7 = RELEASE-zeebe-gateway.NAMESPACE.svc.cluster.local
+DNS.8 = RELEASE-zeebe-0.RELEASE-zeebe.NAMESPACE.svc.cluster.local
+DNS.9 = RELEASE-zeebe-1.RELEASE-zeebe.NAMESPACE.svc.cluster.local
+DNS.10 = RELEASE-zeebe-2.RELEASE-zeebe.NAMESPACE.svc.cluster.local
