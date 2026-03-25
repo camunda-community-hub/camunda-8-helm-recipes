@@ -43,6 +43,9 @@ annotate-grpc-ingress-tls: annotate-remove-grpc-ingress-tls
 
 .PHONY: annotate-ingress-tls
 annotate-ingress-tls: annotate-grpc-ingress-tls annotate-http-ingress-tls
+	
+.PHONY: annotate-remove-ingress-tls
+annotate-remove-ingress-tls: annotate-remove-grpc-ingress-tls annotate-remove-http-ingress-tls
 
 .PHONY: annotate-letsencrypt-stage
 annotate-letsencrypt-stage: annotate-remove-ingress-tls
