@@ -47,6 +47,7 @@ global:
         existingSecretKey: "identity-keycloak-admin-password"
   elasticsearch:
     enabled: true
+
 identity:
   enabled: true
   contextPath: /management
@@ -61,6 +62,7 @@ identity:
   # Use internally provisioned postgresql database for identity
   externalDatabase:
     enabled: false
+
 identityPostgresql:
   enabled: true
   auth:
@@ -70,6 +72,7 @@ identityPostgresql:
     secretKeys:
       adminPasswordKey: identity-postgresql-admin-password
       userPasswordKey: identity-postgresql-user-password
+
 # Keycloak will be installed and will use internally provisioned postgresql database
 identityKeycloak:
   enabled: true
@@ -84,14 +87,51 @@ identityKeycloak:
       secretKeys:
         adminPasswordKey: identity-postgresql-admin-password
         userPasswordKey: identity-postgresql-user-password
+
 console:
   enabled: false
+
 webModeler:
-  enabled: false
+  enabled: true
+  contextPath: /modeler
+  restapi:
+    mail:
+      # This value is required, otherwise the restapi pod wouldn't start.
+      fromAddress: noreply@example.com
+    env:
+      - name: CAMUNDA_MODELER_CLUSTERS_0_ID
+        value: "camunda-demo-cluster"
+      - name: CAMUNDA_MODELER_CLUSTERS_0_NAME
+        value: "Camunda Demo Cluster"
+      - name: CAMUNDA_MODELER_CLUSTERS_0_VERSION
+        value: "8.9.0-alpha5"
+      - name: CAMUNDA_MODELER_CLUSTERS_0_AUTHENTICATION
+        value: "BEARER_TOKEN"
+      - name: CAMUNDA_MODELER_CLUSTERS_0_URL_GRPC
+        value: "grpc://camunda-zeebe-gateway:26500"
+      - name: CAMUNDA_MODELER_CLUSTERS_0_URL_REST
+        value: "http://camunda-zeebe-gateway"
+      - name: CAMUNDA_MODELER_CLUSTERS_0_URL_WEBAPP
+        value: "http://camunda-zeebe/orchestration"
+      - name: CAMUNDA_MODELER_CLUSTERS_0_AUTHORIZATIONS_ENABLED
+        value: "true"
+      - name: LOGGING_LEVEL_IO_GRPC
+        value: "TRACE"
+      - name: LOGGING_LEVEL_IO_CAMUNDA_MODELER
+        value: "DEBUG"
+      - name: SPRING_PROFILES_INCLUDE
+        value: "default-logging"
+
 webModelerPostgresql:
-  enabled: false
+  enabled: true
+  auth:
+    existingSecret: "camunda-credentials"
+    secretKeys:
+      adminPasswordKey: webmodeler-postgresql-admin-password
+      userPasswordKey: webmodeler-postgresql-user-password
+
 connectors:
-  enabled: false
+  enabled: true
   security:
     authentication:
       method: oidc
@@ -99,6 +139,7 @@ connectors:
         secret:
           existingSecret: camunda-credentials
           existingSecretKey: identity-connectors-client-token
+
 orchestration:
   enabled: true
   gateway:
@@ -116,9 +157,12 @@ orchestration:
   data:
     secondaryStorage:
       type: elasticsearch
+
 optimize:
   enabled: false
+
 elasticsearch:
   enabled: true
+
 prometheusServiceMonitor:
   enabled: true
