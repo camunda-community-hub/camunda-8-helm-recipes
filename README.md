@@ -26,7 +26,7 @@ The [recipes](./recipes) directory combines `Makefiles` and `camunda-values.yaml
 
 ## How does it work?
 
-Each recipe contains a `Makefile` which makes use of `Make` targets from files found inside [makefiles](./makefiles) directory. `Make` targets use command line tools and bash scripts to accomplish the work of each profile. For example, [makefiles/camunda.mk](./makefiles/camunda.mk) defines a `Make` target `make camunda`, which will install Camunda via helm charts. 
+Each recipe contains a `Makefile` which makes use of `make` targets from files found inside [makefiles](./makefiles) directory. `make` targets use command line tools and bash scripts to accomplish the work of each profile. For example, [makefiles/camunda.mk](./makefiles/camunda.mk) defines a `make` target `make camunda`, which will install Camunda via Helm charts. 
 
 Each recipe also makes use of one or more `camunda-values.yaml` files found inside the [camunda-values.yaml.d](./camunda-values.yaml.d) directory. These files provide configuration settings for the Camunda Helm charts. Each recipe may also include its own `my-camunda-values.yaml` file to provide additional configuration settings specific to that recipe.
 
