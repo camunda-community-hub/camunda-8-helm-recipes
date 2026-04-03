@@ -4,9 +4,16 @@
 
 # Camunda 8 Helm Recipes
 
-This is a Community Project that helps to install Camunda and other supporting technologies into Kubernetes.
+This is a Community Project that helps to install Camunda and other supporting technologies into Kubernetes using the [Camunda Helm Charts](https://github.com/camunda/camunda-platform-helm).
+Allways refer to the [official installation procedures](https://docs.camunda.io/docs/self-managed/deployment/helm/)
+first and use the recipes provided here as additional examples.
 
-Those who are already familiar with DevOps and Kubernetes may find it easier, and more flexible, to use the official [Camunda Helm Charts](https://github.com/camunda/camunda-platform-helm) along with your own methods and tools. 
+This repository contains Helm chart values that are compatible with Camunda 8.9 and higher,
+i.e. Camunda Helm Chart 14 and higher.
+Example configurations for older versions can be found in the old repository of
+[Camunda 8 Helm Profiles](https://github.com/camunda-community-hub/camunda-8-helm-profiles).
+
+Those who are already familiar with DevOps and Kubernetes may find it easier, and more flexible, to use the [Camunda Helm Charts](https://github.com/camunda/camunda-platform-helm) along with your own methods and tools. 
 
 For those looking for more guidance, this project provides `Makefiles`, along with custom scripts and `camunda-values.yaml` files to help with: 
 
