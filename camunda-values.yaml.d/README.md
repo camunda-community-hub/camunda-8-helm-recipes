@@ -1,6 +1,11 @@
 # Shared Camunda Values Directory
 
-This directory contains reusable Helm values files that can be composed together to create different Camunda Platform 8 configurations. Each file provides a specific configuration aspect that can be mixed and matched across different profiles.
+This directory contains reusable Helm chart values files that can be composed together to create different Camunda Platform 8 configurations. Each file provides a specific configuration aspect that can be mixed and matched across different profiles.
+
+This repository contains chart values that are compatible with Camunda 8.9 and higher,
+i.e. Camunda Helm Chart 14 and higher.
+Example configurations for older versions can be found in the old repository of
+[Camunda 8 Helm Profiles](https://github.com/camunda-community-hub/camunda-8-helm-profiles).
 
 ## Purpose
 
