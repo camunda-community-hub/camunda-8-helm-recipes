@@ -46,3 +46,29 @@ Each recipe also makes use of one or more `camunda-values.yaml` files found insi
        make --version
 
 Each recipe may have additional prerequisites. See the `README.md` file inside each recipe for more details.
+
+## Contributing
+
+When making changes to a recipe — such as modifying `my-camunda-values.yaml`, `config.mk`, or any of the shared values files in `camunda-values.yaml.d` — validate your changes by running the recipe's test target before submitting a pull request.
+
+Each Camunda recipe includes a `make test` target that generates `camunda-values.yaml` using the recipe's default configuration and compares it against the `sample-camunda-values.yaml` file, which serves as the expected output.
+
+To test a single recipe:
+
+```bash
+make -C recipes/camunda/basic-ingress-nginx-tls test
+```
+
+To test all Camunda recipes at once:
+
+```bash
+make -C recipes/camunda test
+```
+
+If a test fails, a diff will be printed showing what changed. If the change is intentional, update `sample-camunda-values.yaml` in the affected recipe to reflect the new expected output:
+
+```bash
+make -C recipes/camunda/basic-ingress-nginx-tls camunda-values.yaml
+cp recipes/camunda/basic-ingress-nginx-tls/camunda-values.yaml \
+   recipes/camunda/basic-ingress-nginx-tls/sample-camunda-values.yaml
+```
