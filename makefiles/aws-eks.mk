@@ -128,6 +128,13 @@ connect-eks:
 	@echo "   Identity:      $$(aws sts get-caller-identity --query 'Arn' --output text 2>/dev/null)"
 	@echo "   Cluster:       $(DEPLOYMENT_NAME) [$(AWS_REGION)]"
 	@echo "   kubectl ctx:   $$(kubectl config current-context 2>/dev/null)"
+	@echo ""
+	@echo "Verifying kubectl connectivity..."
+	@if kubectl get nodes --request-timeout=10s > /dev/null 2>&1; then \
+		echo "✅ kubectl:        connected ($$(kubectl get nodes --no-headers 2>/dev/null | wc -l | tr -d ' ') nodes ready)"; \
+	else \
+		echo "❌ kubectl:        cannot reach cluster — token may be expired, run 'aws sso login' or check your kubeconfig"; \
+	fi
 
 .PHONY: urls
 urls:
