@@ -11,21 +11,16 @@ endif
 # Theses are the default values used by this recipe
 include ./config.mk
 
+
 .PHONY: all
-all: kube setup-aurora-db
-
-.PHONY: setup-aurora-db
-setup-aurora-db: create-aurora-db allow-eks-to-rds test-aurora-from-eks allow-local-to-rds test-aurora-from-local setup-all-dbs
-	@echo "Aurora DB and Camunda database setup complete."
-
-.PHONY: setup-ingress-nginx
-setup-ingress-nginx: ingress-nginx cert-manager letsencrypt-prod ingress-aws-ip-from-service
+all: camunda-values.yaml create-camunda-credentials camunda
 
 .PHONY: clean
-clean: destroy-aurora-db clean-kube
+clean: clean-camunda
 
 include $(root)/makefiles/aws-eks.mk
 include $(root)/makefiles/aws-aurora.mk
 include $(root)/makefiles/camunda.mk
 include $(root)/makefiles/letsencrypt.mk
 include $(root)/makefiles/ingress-nginx.mk
+include $(root)/makefiles/test.mk

@@ -6,7 +6,7 @@ Sample of how to configure 8.9 with nginx ingress and tls.
 
 ```shell
 helm upgrade --install --namespace camunda camunda /Users/dave/code/camunda-platform-helm/charts/camunda-platform-8.9 \
--f ./camunda-values.yaml --version 14.0.0-alpha4 --skip-crds
+-f ./camunda-values.yaml --version 14.0.0 --skip-crds
 ```
 
 ## Features

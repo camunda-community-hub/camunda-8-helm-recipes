@@ -80,6 +80,7 @@ Each recipe under `recipes/camunda/` contains:
 | `basic-ingress-nginx-tls` | elasticsearch, ingress-nginx, metrics, connectors-enabled, orchestration-elasticsearch, my-camunda-values | Minimal setup; Elasticsearch backend |
 | `oidc-ingress-nginx-tls` | same as above + connectors-oidc, identity-keycloak-internal-postgres, modeler-enabled, modeler-internal-postgres, orchestration-oidc, enable-multitenancy, my-camunda-values | Full auth stack; Keycloak, Identity, Web Modeler, multi-tenancy |
 | `rdbms-postgres` | orchestration-rdbms-postgres, my-camunda-values | External Aurora/Postgres backend; no ingress |
+| `rdbms-postgres-oidc` | enable-ingress-nginx, identity-keycloak-external-postgres, connectors-oidc, orchestration-rdbms-postgres, orchestration-oidc, my-camunda-values | External Postgres + Keycloak OIDC for Orchestration and Connectors; ingress nginx (HTTP, no TLS) |
 
 ---
 
@@ -90,13 +91,13 @@ Each recipe under `recipes/camunda/` contains:
 | `camunda.mk` | Camunda install/uninstall | `camunda`, `camunda-values.yaml`, `install-camunda`, `dry-run-camunda`, `create-camunda-credentials`, `update-camunda`, `clean-camunda`, `template`, `port-*`, `pods` |
 | `test.mk` | Test framework | `test` — generates values, diffs vs. sample, cleans up |
 | `kind.mk` | Local Kind clusters | `kube-kind`, `clean-kube-kind`, `use-kube` |
-| `aws-eks.mk` | AWS EKS | `kube-aws`, `oidc-provider`, `install-ebs-csi-controller-addon`, `scale-down`, `scale-up`, `kube-upgrade` |
-| `aws-aurora.mk` | AWS Aurora RDS | `create-aurora-db`, `setup-all-dbs`, `allow-eks-to-rds`, `test-aurora-from-eks`, `destroy-aurora-db` |
+| `aws-eks.mk` | AWS EKS | `kube-aws`, `oidc-provider`, `install-ebs-csi-controller-addon`, `scale-down`, `scale-up`, `kube-upgrade`, `ingress-aws-ip-from-service`, `update-route53-dns`, `connect-eks` |
+| `aws-aurora.mk` | AWS Aurora RDS | `create-aurora-db`, `setup-all-dbs`, `allow-eks-to-rds`, `test-aurora-from-eks`, `destroy-aurora-db` — all targets pass `--region $(AWS_REGION)` |
 | `aws-vpc.mk` | AWS VPC utilities | Minimal |
-| `azure-aks.mk` | Azure AKS | `kube-aks`, `kube-agic`, `ingress-nginx-azure` |
-| `azure-common.mk` | Azure shared setup | Cloud provider init |
-| `google-gke.mk` | Google GKE | `kube-gke`, `node-pool`, `ssd-storageclass`, `scale-*` |
-| `google-common.mk` | Google shared setup | Cloud provider init |
+| `azure-aks.mk` | Azure AKS | `kube-aks`, `kube-agic`, `ingress-nginx-azure`, `connect-aks` |
+| `azure-common.mk` | Azure shared setup | `check-az` |
+| `google-gke.mk` | Google GKE | `kube-gke`, `node-pool`, `ssd-storageclass`, `scale-*`, `connect-gke` |
+| `google-common.mk` | Google shared setup | `check-gcloud` |
 | `ingress-nginx.mk` | Nginx ingress | `ingress-ip-from-service`, `ingress-hostname-from-service`, `annotate-ingress-proxy-buffer-size` |
 | `letsencrypt.mk` | Let's Encrypt / cert-manager | `cert-manager`, `letsencrypt-staging`, `letsencrypt-prod`, `annotate-ingress-tls`, `cacerts-staging` |
 | `tls-self-signed-cert.mk` | Self-signed certs (OpenSSL) | `create-custom-certs`, `create-tls-secret`, `create-grpc-tls-secret` |
@@ -175,10 +176,13 @@ The `DEFAULT_PASSWORD` variable in recipe `config.mk` is used by `create-camunda
 ## Common Patterns & Gotchas
 
 - **Array merge limitation**: `yq` replaces arrays entirely. If multiple values files set the same array key (e.g., `zeebe.env`), only the last one wins. Consolidate array definitions into a single file or into `my-camunda-values.yaml`.
-- **Root `config.mk`**: Create a `config.mk` at repo root to override variables (e.g., `HOST_NAME`, `AWS_REGION`) without touching committed files. This file is gitignored.
+- **Root `config.mk`**: Create a `config.mk` at repo root to override variables (e.g., `HOST_NAME`, `AWS_REGION`, `HOSTED_ZONE_NAME`) without touching committed files. This file is gitignored.
+- **`ingress-aws-ip-from-service`**: Resolves the ELB IP via `dig` on the hostname from the ingress-nginx service — does NOT use the AWS ENI API (which only works for Classic LBs, not NLBs).
+- **`update-route53-dns`**: Upserts A records for `HOST_NAME` and `grpc.HOST_NAME` in Route 53. Requires `HOSTED_ZONE_NAME` (the zone domain name, e.g. `aws.c8sm.com`) — the target looks up the zone ID automatically. Do not set `HOSTED_ZONE_ID`.
 - **`-include` vs `include`**: Recipes use `-include $(root)/config.mk` (dash = don't fail if missing) for the user's root override, and `include ./config.mk` (no dash) for the recipe's own defaults.
 - **`camunda-values.yaml` is always deleted first**: The `camunda-values.yaml` target depends on `delete-camunda-values`, ensuring a clean regeneration every time.
 - **Cloud provider recipes are independent of Camunda recipes**: Provision your cluster with a cloud recipe first, then use a Camunda recipe to install.
+- **`connect-gke` / `connect-eks` / `connect-aks`**: Use these instead of `use-kube` when switching between environments during the day. Each target checks whether the cloud session is still valid, re-authenticates interactively if expired (`gcloud auth login` / `aws sso login` / `az login`), updates the kubectl context, and prints a status banner showing the active cloud, account/identity, cluster, region, and current kubectl context.
 
 ---
 

@@ -116,6 +116,26 @@ clean-kube: clean-kube-aws
 use-kube:
 	eksctl utils write-kubeconfig -c $(DEPLOYMENT_NAME) --region $(AWS_REGION)
 
+.PHONY: connect-eks
+connect-eks:
+	@echo "--- Connecting to EKS ---"
+	@aws sts get-caller-identity > /dev/null 2>&1 || \
+		(echo "AWS session expired. Re-authenticating..." && aws sso login)
+	eksctl utils write-kubeconfig -c $(DEPLOYMENT_NAME) --region $(AWS_REGION)
+	@echo ""
+	@echo "✅ Active cloud:  AWS (Amazon Web Services)"
+	@echo "   Account:       $$(aws sts get-caller-identity --query 'Account' --output text 2>/dev/null)"
+	@echo "   Identity:      $$(aws sts get-caller-identity --query 'Arn' --output text 2>/dev/null)"
+	@echo "   Cluster:       $(DEPLOYMENT_NAME) [$(AWS_REGION)]"
+	@echo "   kubectl ctx:   $$(kubectl config current-context 2>/dev/null)"
+	@echo ""
+	@echo "Verifying kubectl connectivity..."
+	@if kubectl get nodes --request-timeout=10s > /dev/null 2>&1; then \
+		echo "✅ kubectl:        connected ($$(kubectl get nodes --no-headers 2>/dev/null | wc -l | tr -d ' ') nodes ready)"; \
+	else \
+		echo "❌ kubectl:        cannot reach cluster — token may be expired, run 'aws sso login' or check your kubeconfig"; \
+	fi
+
 .PHONY: urls
 urls:
 	@echo "Cluster: https://$(AWS_REGION).console.aws.amazon.com/eks/home?region=$(AWS_REGION)#/clusters/$(DEPLOYMENT_NAME)"
@@ -152,3 +172,50 @@ scale-up-nodegroup: check-aws-cli
 .PHONY: scale-up
 scale-up:
 	$(MAKE) scale-up-nodegroup NODEGROUP_NAME=$(NODEGROUP_NAME) SCALE_SIZE=$(DESIRED_SIZE)
+
+.PHONY: ingress-aws-ip-from-service
+ingress-aws-ip-from-service:
+	@echo "Waiting for ingress-nginx-controller LoadBalancer hostname..."
+	@ELB_HOSTNAME=""; \
+	while [ -z "$$ELB_HOSTNAME" ]; do \
+		ELB_HOSTNAME=$$(kubectl get service ingress-nginx-controller -n ingress-nginx \
+			--output jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null); \
+		[ -z "$$ELB_HOSTNAME" ] && echo "Still waiting..." && sleep 5; \
+	done; \
+	echo "ELB Hostname: $$ELB_HOSTNAME"; \
+	IP=$$(dig +short $$ELB_HOSTNAME | head -1); \
+	echo "ELB IP: $$IP"
+
+# Upserts an A record in Route 53 pointing HOST_NAME to the ingress-nginx ELB IP.
+# Requires HOSTED_ZONE_NAME (e.g. aws.c8sm.com) and HOST_NAME to be set (override in root config.mk).
+# Usage: make update-route53-dns
+.PHONY: update-route53-dns
+update-route53-dns:
+	@echo "Looking up ELB hostname from ingress-nginx service..."
+	@ELB_HOSTNAME=$$(kubectl get service ingress-nginx-controller -n ingress-nginx \
+		--output jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null); \
+	if [ -z "$$ELB_HOSTNAME" ]; then \
+		echo "❌ No ELB hostname found. Is ingress-nginx running?"; exit 1; \
+	fi; \
+	echo "ELB Hostname: $$ELB_HOSTNAME"; \
+	IP=$$(dig +short $$ELB_HOSTNAME | head -1); \
+	if [ -z "$$IP" ]; then \
+		echo "❌ Could not resolve $$ELB_HOSTNAME to an IP address."; exit 1; \
+	fi; \
+	echo "Looking up Route 53 hosted zone ID for $(HOSTED_ZONE_NAME)..."; \
+	ZONE_ID=$$(aws route53 list-hosted-zones-by-name \
+		--dns-name $(HOSTED_ZONE_NAME) \
+		--max-items 1 \
+		--query "HostedZones[0].Id" \
+		--output text | cut -d'/' -f3); \
+	if [ -z "$$ZONE_ID" ] || [ "$$ZONE_ID" = "None" ]; then \
+		echo "❌ Could not find hosted zone for $(HOSTED_ZONE_NAME)"; exit 1; \
+	fi; \
+	echo "Zone ID: $$ZONE_ID"; \
+	echo "Upserting Route 53 A records: $(HOST_NAME) and grpc.$(HOST_NAME) → $$IP"; \
+	aws route53 change-resource-record-sets \
+		--hosted-zone-id $$ZONE_ID \
+		--change-batch '{"Changes":[{"Action":"UPSERT","ResourceRecordSet":{"Name":"$(HOST_NAME)","Type":"A","TTL":60,"ResourceRecords":[{"Value":"'"$$IP"'"}]}},{"Action":"UPSERT","ResourceRecordSet":{"Name":"grpc.$(HOST_NAME)","Type":"A","TTL":60,"ResourceRecords":[{"Value":"'"$$IP"'"}]}}]}' \
+		--no-cli-pager; \
+	echo "✅ DNS updated: $(HOST_NAME) → $$IP"; \
+	echo "✅ DNS updated: grpc.$(HOST_NAME) → $$IP"

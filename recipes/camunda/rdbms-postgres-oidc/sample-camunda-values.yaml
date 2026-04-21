@@ -1,0 +1,128 @@
+global:
+  ingress:
+    enabled: true
+    className: nginx
+    host: "example.camunda.com"
+    tls:
+      enabled: true
+      secretName: "tls-secret"
+  security:
+    authentication:
+      method: oidc
+  identity:
+    auth:
+      enabled: true
+      publicIssuerUrl: https://example.camunda.com/auth/realms/camunda-platform
+      issuerBackendUrl: http://camunda-keycloak/auth/realms/camunda-platform
+      authUrl: https://example.camunda.com/auth/realms/camunda-platform/protocol/openid-connect/auth
+      tokenUrl: http://camunda-keycloak/auth/realms/camunda-platform/protocol/openid-connect/token
+      jwksUrl: http://camunda-keycloak/auth/realms/camunda-platform/protocol/openid-connect/certs
+      identity:
+        redirectUrl: https://example.camunda.com/identity
+      webModeler:
+        redirectUrl: https://example.camunda.com/modeler
+      # if optimize is disabled, then this shouldn't be required,
+      # but this is a known issue that, currently, identity requires this even if optimize is disabled.
+      optimize:
+        secret:
+          existingSecret: camunda-credentials
+          existingSecretKey: identity-optimize-client-token
+    # This defines how Identity authenticates to Keycloak admin API
+    # Identity will connect to Keycloak the first time it boots and create the camunda-platform realm
+    keycloak:
+      url:
+        protocol: http
+        host: camunda-keycloak
+        port: 80
+      contextPath: /auth
+      realm: /realms/camunda-platform
+      auth:
+        adminUser: admin
+        existingSecret: "camunda-credentials"
+        existingSecretKey: "identity-keycloak-admin-password"
+orchestration:
+  gateway:
+    grpc:
+      enabled: true
+  contextPath: "/orchestration"
+  ingress:
+    grpc:
+      enabled: true
+      host: "grpc.example.camunda.com"
+      path: "/"
+      tls:
+        enabled: true
+        secretName: "grpc-tls-secret"
+  enabled: true
+  exporters:
+    camunda:
+      enabled: false
+    rdbms:
+      enabled: true
+  data:
+    secondaryStorage:
+      type: rdbms
+      rdbms:
+        url: jdbc:postgresql://mypostgresql.camunda.com:5432/camunda
+        username: camunda
+        secret:
+          existingSecret: camunda-credentials
+          existingSecretKey: orchestration-rdbms-password
+  security:
+    authentication:
+      oidc:
+        secret:
+          existingSecret: "camunda-credentials"
+          existingSecretKey: "identity-orchestration-client-token"
+        redirectUrl: https://example.camunda.com/orchestration
+# Identity configured to point to an external postgresql database
+identity:
+  enabled: true
+  firstUser:
+    secret:
+      existingSecret: "camunda-credentials"
+      existingSecretKey: "identity-first-user-password"
+  env:
+    - name: KEYCLOAK_REALM
+      value: camunda-platform
+  externalDatabase:
+    enabled: true
+    host: mypostgresql.camunda.com
+    port: 5432
+    database: identity
+    schema: public
+    username: identity
+    secret:
+      existingSecret: camunda-credentials
+      existingSecretKey: identity-postgresql-user-password
+# Keycloak will be installed but configure it to point to an external postgresql database
+identityKeycloak:
+  enabled: true
+  # This defines the admin user and password for Keycloak. Keycloak will create this user during first start
+  auth:
+    adminUser: admin
+    existingSecret: camunda-credentials
+    passwordSecretKey: identity-keycloak-admin-password
+  # Tell the Keycloak chart to disable its internal database so that we can configure an external one
+  postgresql:
+    enabled: false
+  # Tell the Keycloak chart to use an external database
+  externalDatabase:
+    host: mypostgresql.camunda.com
+    port: 5432
+    database: bitnami_keycloak
+    schema: public
+    # The username that keycloak uses to connect to the external db
+    user: bn_keycloak
+    # The password that keycloak uses to connect to the external database
+    existingSecret: camunda-credentials
+    existingSecretPasswordKey: identity-keycloak-user-password
+connectors:
+  enabled: true
+  security:
+    authentication:
+      method: oidc
+      oidc:
+        secret:
+          existingSecret: camunda-credentials
+          existingSecretKey: identity-connectors-client-token

@@ -1,3 +1,15 @@
+# Identity + Keycloak with internally provisioned PostgreSQL
+# Combine with oidc.yaml for OIDC authentication.
+# Mutually exclusive with identity-keycloak-external-postgres.yaml.
+#
+# Defaults already provide:
+#   identity.externalDatabase.enabled: false # only needed for resource authorization, multi-tenancy, or an external identity provider (IdP)
+#   identityPostgresql.auth.username: identity
+#   identityPostgresql.auth.database: identity
+#   identityPostgresql.auth.secretKeys.adminPasswordKey: identity-postgresql-admin-password
+#   identityPostgresql.auth.secretKeys.userPasswordKey: identity-postgresql-user-password
+#   identityKeycloak.auth.existingSecret: camunda-credentials
+#   identityKeycloak.auth.passwordSecretKey: identity-keycloak-admin-password
 elasticsearch:
   enabled: true
 global:
@@ -13,7 +25,6 @@ global:
       method: oidc
   identity:
     auth:
-      enabled: true
       publicIssuerUrl: https://example.camunda.com/auth/realms/camunda-platform
       issuerBackendUrl: http://camunda-keycloak/auth/realms/camunda-platform
       authUrl: https://example.camunda.com/auth/realms/camunda-platform/protocol/openid-connect/auth
@@ -21,27 +32,24 @@ global:
       jwksUrl: http://camunda-keycloak/auth/realms/camunda-platform/protocol/openid-connect/certs
       identity:
         redirectUrl: https://example.camunda.com/management
-      # if optimize is disabled, then this shouldn't be required,
-      # but this is a known issue that, currently, identity requires this even if optimize is disabled.
+      orchestration:
+        secret:
+          existingSecret: camunda-credentials
+          existingSecretKey: identity-orchestration-client-token
+        redirectUrl: https://example.camunda.com/orchestration
+      # Currently required by Identity even when Optimize is disabled
       optimize:
         secret:
           existingSecret: camunda-credentials
           existingSecretKey: identity-optimize-client-token
       webModeler:
         redirectUrl: https://example.camunda.com/modeler
-      orchestration:
-        secret:
-          existingSecret: camunda-credentials
-          existingSecretKey: identity-orchestration-client-token
-        redirectUrl: https://example.camunda.com/orchestration
-    # This defines how Identity authenticates to Keycloak admin API
-    # Identity will connect to Keycloak the first time it boots and create the camunda-platform realm
     keycloak:
       url:
         protocol: http
         host: camunda-keycloak
         port: 80
-      contextPath: /auth
+      # contextPath defaults to /auth
       realm: /realms/camunda-platform
       auth:
         adminUser: admin
@@ -55,7 +63,7 @@ orchestration:
   gateway:
     grpc:
       enabled: true
-  contextPath: "/orchestration"
+  contextPath: "/"
   ingress:
     grpc:
       enabled: true
@@ -94,31 +102,20 @@ identity:
   env:
     - name: KEYCLOAK_REALM
       value: camunda-platform
-  # Use internally provisioned postgresql database for identity
-  externalDatabase:
-    enabled: false
   multitenancy:
     enabled: true
 identityPostgresql:
   enabled: true
   auth:
-    username: identity
-    database: identity
     existingSecret: camunda-credentials
-    secretKeys:
-      adminPasswordKey: identity-postgresql-admin-password
-      userPasswordKey: identity-postgresql-user-password
-# Keycloak will be installed and will use internally provisioned postgresql database
+# Keycloak will be installed and will use internally provisioned PostgreSQL database
 identityKeycloak:
   enabled: true
-  # This defines the admin user and password for Keycloak. Keycloak will create this user during first start
-  auth:
-    adminUser: admin
-    existingSecret: camunda-credentials
-    passwordSecretKey: identity-keycloak-admin-password
   postgresql:
     auth:
       existingSecret: camunda-credentials
+      # Override default key names so Keycloak's internal PostgreSQL
+      # shares the same secret keys as identityPostgresql:
       secretKeys:
         adminPasswordKey: identity-postgresql-admin-password
         userPasswordKey: identity-postgresql-user-password
@@ -135,7 +132,7 @@ webModeler:
       - name: CAMUNDA_MODELER_CLUSTERS_0_NAME
         value: "Camunda Demo Cluster"
       - name: CAMUNDA_MODELER_CLUSTERS_0_VERSION
-        value: "8.9.0-alpha5"
+        value: "8.9.0"
       - name: CAMUNDA_MODELER_CLUSTERS_0_AUTHENTICATION
         value: "BEARER_TOKEN"
       - name: CAMUNDA_MODELER_CLUSTERS_0_URL_GRPC

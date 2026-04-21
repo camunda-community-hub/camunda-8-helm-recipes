@@ -10,7 +10,7 @@ create-db-subnet-group-from-eks:
 		--query 'cluster.resourcesVpcConfig.subnetIds' --output text))
 
 	@# Filter loop to find only public subnets
-	@PUBLIC_SUBNETS=""; \
+	-@PUBLIC_SUBNETS=""; \
 	for s in $(EKS_SUBNETS); do \
 		IGW=$$(aws ec2 describe-route-tables --region $(AWS_REGION) \
 			--filters "Name=association.subnet-id,Values=$$s" \
@@ -32,18 +32,6 @@ create-db-subnet-group-from-eks:
 		--region $(AWS_REGION) \
 		--no-cli-pager
 
-#.PHONY: create-db-subnet-group-from-eks
-#create-db-subnet-group-from-eks:
-#	$(eval SUBNETS := $(shell aws eks describe-cluster --name $(DEPLOYMENT_NAME) --region $(AWS_REGION) \
-#	  --query 'cluster.resourcesVpcConfig.subnetIds' --output text))
-##	$(eval VPC_ID := $(shell aws ec2 describe-vpcs --filters "Name=tag:Name,Values=$(VPC_NAME)" --query "Vpcs[0].VpcId" --output text))
-##	$(eval SUBNETS := $(shell aws ec2 describe-subnets --filters "Name=vpc-id,Values=$(VPC_ID)" --query "Subnets[*].SubnetId" --output text))
-#	aws rds create-db-subnet-group \
-#		--db-subnet-group-name $(DEPLOYMENT_NAME)-aurora-group \
-#		--db-subnet-group-description "Subnet Aurora db group for $(DEPLOYMENT_NAME)" \
-#		--subnet-ids $(SUBNETS) \
-#		--no-cli-pager
-
 .PHONY: create-aurora-db-secret
 create-aurora-db-secret: delete-aurora-db-secret
 	@echo "Creating secret in AWS Secrets Manager..."
@@ -51,6 +39,7 @@ create-aurora-db-secret: delete-aurora-db-secret
 		--name $(DEPLOYMENT_NAME)-db-secret \
 		--description "Admin credentials for $(DEPLOYMENT_NAME) Aurora cluster" \
 		--secret-string '{"username":"$(POSTGRES_MASTER_USERNAME)","password":"$(POSTGRES_MASTER_PASSWORD)"}' \
+		--region $(AWS_REGION) \
 		--no-cli-pager
 
 .PHONY: delete-aurora-db-secret
@@ -59,21 +48,23 @@ delete-aurora-db-secret:
 	-aws secretsmanager delete-secret \
 		--secret-id $(DEPLOYMENT_NAME)-db-secret \
 		--force-delete-without-recovery \
+		--region $(AWS_REGION) \
 		--no-cli-pager
 	@echo "Secret scheduled for immediate deletion."
 
 .PHONY: create-aurora-db
 create-aurora-db: create-db-subnet-group-from-eks
-	aws rds create-db-cluster \
+	-aws rds create-db-cluster \
 		--db-cluster-identifier $(DEPLOYMENT_NAME)-cluster \
 		--engine aurora-postgresql \
 		--master-username $(POSTGRES_MASTER_USERNAME) \
 		--master-user-password $(POSTGRES_MASTER_PASSWORD) \
 		--db-subnet-group-name $(DEPLOYMENT_NAME)-aurora-group \
+		--region $(AWS_REGION) \
 		--no-cli-pager
 
 	@echo "Waiting for cluster to initialize..."
-	aws rds wait db-cluster-available --db-cluster-identifier $(DEPLOYMENT_NAME)-cluster
+	aws rds wait db-cluster-available --db-cluster-identifier $(DEPLOYMENT_NAME)-cluster --region $(AWS_REGION)
 
 	@echo "Creating Instance..."
 	aws rds create-db-instance \
@@ -82,11 +73,13 @@ create-aurora-db: create-db-subnet-group-from-eks
 		--engine aurora-postgresql \
 		--db-instance-class db.t3.medium \
 		--publicly-accessible \
+		--region $(AWS_REGION) \
 		--no-cli-pager
 
 	@echo "Waiting for instance $(DEPLOYMENT_NAME)-instance to reach 'Available' state..."
 	aws rds wait db-instance-available \
 		--db-instance-identifier $(DEPLOYMENT_NAME)-instance \
+		--region $(AWS_REGION) \
 		--no-cli-pager
 	@echo "Instance is ready for connections."
 
@@ -95,6 +88,7 @@ _setup-db:
 	@echo "Fetching master password and endpoint..."
 	$(eval DB_HOST := $(shell aws rds describe-db-clusters \
 		--db-cluster-identifier $(DEPLOYMENT_NAME)-cluster \
+		--region $(AWS_REGION) \
 		--query "DBClusters[0].Endpoint" --output text))
 
 	@echo "Connecting to $(DB_HOST) to provision $(DB_NAME) database and user..."
@@ -122,6 +116,7 @@ _cleanup-db:
 	@echo "Fetching master password and endpoint..."
 	$(eval DB_HOST := $(shell aws rds describe-db-clusters \
 		--db-cluster-identifier $(DEPLOYMENT_NAME)-cluster \
+		--region $(AWS_REGION) \
 		--query "DBClusters[0].Endpoint" --output text))
 
 	@echo "Terminating active connections and dropping $(DB_NAME)..."
@@ -205,27 +200,29 @@ destroy-aurora-db: revoke-local-to-rds revoke-eks-to-rds delete-aurora-db-secret
 	-aws rds delete-db-instance \
 		--db-instance-identifier $(DEPLOYMENT_NAME)-instance \
 		--skip-final-snapshot \
+		--region $(AWS_REGION) \
 		--no-cli-pager
 
 	@echo "Waiting for instance to be deleted (this may take a few minutes)..."
-	@aws rds wait db-instance-deleted --db-instance-identifier $(DEPLOYMENT_NAME)-instance
+	@aws rds wait db-instance-deleted --db-instance-identifier $(DEPLOYMENT_NAME)-instance --region $(AWS_REGION)
 
 	@echo "Deleting RDS Cluster: $(DEPLOYMENT_NAME)-cluster..."
 	-aws rds delete-db-cluster \
 		--db-cluster-identifier $(DEPLOYMENT_NAME)-cluster \
 		--skip-final-snapshot \
+		--region $(AWS_REGION) \
 		--no-cli-pager
 
 	@echo "Waiting for cluster to be deleted..."
 	@# Note: There is no 'wait db-cluster-deleted' in some CLI versions,
 	@# so we loop until the describe command fails or returns nothing.
-	@while aws rds describe-db-clusters --db-cluster-identifier $(DEPLOYMENT_NAME)-cluster >/dev/null 2>&1; do \
+	@while aws rds describe-db-clusters --db-cluster-identifier $(DEPLOYMENT_NAME)-cluster --region $(AWS_REGION) >/dev/null 2>&1; do \
 		sleep 10; \
 		echo "Still deleting cluster..."; \
 	done
 
 	@echo "Deleting DB Subnet Group: $(DEPLOYMENT_NAME)-aurora-group..."
-	-aws rds delete-db-subnet-group --db-subnet-group-name $(DEPLOYMENT_NAME)-aurora-group --no-cli-pager
+	-aws rds delete-db-subnet-group --db-subnet-group-name $(DEPLOYMENT_NAME)-aurora-group --region $(AWS_REGION) --no-cli-pager
 	@echo "Database infrastructure for $(DEPLOYMENT_NAME) destroyed successfully."
 
 .PHONY: allow-local-to-rds
@@ -238,6 +235,7 @@ allow-local-to-rds:
 	$(eval SG_ID := $(shell aws rds describe-db-clusters \
 		--db-cluster-identifier $(DEPLOYMENT_NAME)-cluster \
 		--query "DBClusters[0].VpcSecurityGroups[0].VpcSecurityGroupId" \
+		--region $(AWS_REGION) \
 		--no-cli-pager --output text))
 
 	@echo "Opening port 5432 for $(MY_IP)/32 on Security Group $(SG_ID)..."
@@ -246,6 +244,7 @@ allow-local-to-rds:
 		--protocol tcp \
 		--port 5432 \
 		--cidr $(MY_IP)/32 \
+		--region $(AWS_REGION) \
 		--no-cli-pager || echo "Access already open or rule exists."
 
 .PHONY: revoke-local-to-rds
@@ -254,6 +253,7 @@ revoke-local-to-rds:
 	$(eval SG_ID := $(shell aws rds describe-db-clusters \
 		--db-cluster-identifier $(DEPLOYMENT_NAME)-cluster \
 		--query "DBClusters[0].VpcSecurityGroups[0].VpcSecurityGroupId" \
+		--region $(AWS_REGION) \
 		--no-cli-pager --output text))
 	@echo "Revoking access for $(MY_IP)..."
 	-@aws ec2 revoke-security-group-ingress \
@@ -261,6 +261,7 @@ revoke-local-to-rds:
 		--protocol tcp \
 		--port 5432 \
 		--cidr $(MY_IP)/32 \
+		--region $(AWS_REGION) \
 		--no-cli-pager
 
 .PHONY: check-public-access
@@ -301,9 +302,11 @@ allow-local-to-subnets:
 	$(eval MY_IP := $(shell curl -s ifconfig.me))
 	$(eval VPC_ID := $(shell aws rds describe-db-instances \
 		--db-instance-identifier $(DEPLOYMENT_NAME)-instance \
+		--region $(AWS_REGION) \
 		--query "DBInstances[0].DBSubnetGroup.VpcId" --output text))
 	$(eval IGW_ID := $(shell aws ec2 describe-internet-gateways \
 		--filters "Name=attachment.vpc-id,Values=$(VPC_ID)" \
+		--region $(AWS_REGION) \
 		--query "InternetGateways[0].InternetGatewayId" --output text))
 
 	@if [ -z "$(MY_IP)" ]; then echo "❌ Could not detect local IP"; exit 1; fi
@@ -313,15 +316,18 @@ allow-local-to-subnets:
 	@SUBNETS=$$(aws rds describe-db-subnet-groups \
 		--db-subnet-group-name $(shell aws rds describe-db-clusters \
 			--db-cluster-identifier $(DEPLOYMENT_NAME)-cluster \
+			--region $(AWS_REGION) \
 			--query "DBClusters[0].DBSubnetGroup" --output text) \
+		--region $(AWS_REGION) \
 		--query "DBSubnetGroups[0].Subnets[*].SubnetIdentifier" --output text); \
 	for s in $$SUBNETS; do \
-		RT_ID=$$(aws ec2 describe-route-tables --filters "Name=association.subnet-id,Values=$$s" --query "RouteTables[0].RouteTableId" --output text); \
+		RT_ID=$$(aws ec2 describe-route-tables --region $(AWS_REGION) --filters "Name=association.subnet-id,Values=$$s" --query "RouteTables[0].RouteTableId" --output text); \
 		echo "🛰️  Adding /32 route for $(MY_IP) to IGW in Table $$RT_ID..."; \
 		aws ec2 create-route \
 			--route-table-id $$RT_ID \
 			--destination-cidr-block $(MY_IP)/32 \
-			--gateway-id $(IGW_ID) 2>/dev/null || \
+			--gateway-id $(IGW_ID) \
+			--region $(AWS_REGION) 2>/dev/null || \
 	done
 	@echo "✨ Specific route added. EKS traffic remains on the NAT Gateway."
 
@@ -333,11 +339,13 @@ allow-eks-to-rds:
 	$(eval RDS_SG := $(shell aws rds describe-db-clusters \
 		--db-cluster-identifier $(DEPLOYMENT_NAME)-cluster \
 		--query "DBClusters[0].VpcSecurityGroups[0].VpcSecurityGroupId" \
+		--region $(AWS_REGION) \
 		--no-cli-pager --output text))
 
 	$(eval EKS_SG := $(shell aws eks describe-cluster \
 		--name $(DEPLOYMENT_NAME) \
 		--query "cluster.resourcesVpcConfig.clusterSecurityGroupId" \
+		--region $(AWS_REGION) \
 		--no-cli-pager --output text))
 
 	@echo "RDS Security Group: $(RDS_SG)"
@@ -349,6 +357,7 @@ allow-eks-to-rds:
 		--protocol tcp \
 		--port 5432 \
 		--source-group $(EKS_SG) \
+		--region $(AWS_REGION) \
 		--no-cli-pager || echo "Rule might already exist, skipping..."
 
 .PHONY: revoke-eks-to-rds
@@ -357,11 +366,13 @@ revoke-eks-to-rds:
 	$(eval RDS_SG := $(shell aws rds describe-db-clusters \
 		--db-cluster-identifier $(DEPLOYMENT_NAME)-cluster \
 		--query "DBClusters[0].VpcSecurityGroups[0].VpcSecurityGroupId" \
+		--region $(AWS_REGION) \
 		--no-cli-pager --output text))
 
 	$(eval EKS_SG := $(shell aws eks describe-cluster \
 		--name $(DEPLOYMENT_NAME) \
 		--query "cluster.resourcesVpcConfig.clusterSecurityGroupId" \
+		--region $(AWS_REGION) \
 		--no-cli-pager --output text))
 
 	@echo "RDS Security Group: $(RDS_SG)"
@@ -373,28 +384,34 @@ revoke-eks-to-rds:
 		--protocol tcp \
 		--port 5432 \
 		--source-group $(EKS_SG) \
+		--region $(AWS_REGION) \
 		--no-cli-pager || echo "Rule not found or already removed, skipping..."
 
 .PHONY: set-postgres-host
 set-postgres-host:
-	$(eval POSTGRES_HOST := $(shell aws rds describe-db-clusters --db-cluster-identifier $(DEPLOYMENT_NAME)-cluster --query "DBClusters[0].Endpoint" --output text 2>/dev/null))
+	$(eval POSTGRES_HOST := $(shell aws rds describe-db-clusters --db-cluster-identifier $(DEPLOYMENT_NAME)-cluster --region $(AWS_REGION) --query "DBClusters[0].Endpoint" --output text 2>/dev/null))
 
 .PHONY: test-aurora-from-local
 test-aurora-from-local:
-	$(eval DB_HOST := $(shell aws rds describe-db-clusters --db-cluster-identifier $(DEPLOYMENT_NAME)-cluster --query "DBClusters[0].Endpoint" --output text))
+	$(eval DB_HOST := $(shell aws rds describe-db-clusters --db-cluster-identifier $(DEPLOYMENT_NAME)-cluster --region $(AWS_REGION) --query "DBClusters[0].Endpoint" --output text))
 	@PGPASSWORD='$(POSTGRES_MASTER_PASSWORD)' psql -h $(DB_HOST) -U $(POSTGRES_MASTER_USERNAME) -d postgres -c "SELECT version();"
+
+.PHONY: test-aurora-from-local-as-camunda
+test-aurora-from-local-as-camunda:
+	$(eval DB_HOST := $(shell aws rds describe-db-clusters --db-cluster-identifier $(DEPLOYMENT_NAME)-cluster --region $(AWS_REGION) --query "DBClusters[0].Endpoint" --output text))
+	@PGPASSWORD='$(DEFAULT_PASSWORD)' psql -h $(DB_HOST) -U $(POSTGRES_CAMUNDA_USERNAME) -d postgres -c "SELECT version();"
 
 # Usage: make get-db-url DEPLOIYMENT_NAME=my-aurora
 .PHONY: get-aurora-connection-string
 get-aurora-connection-string:
-	$(eval ENDPOINT := $(shell aws rds describe-db-clusters --db-cluster-identifier $(DEPLOYMENT_NAME)-cluster --query "DBClusters[0].Endpoint" --output text))
+	$(eval ENDPOINT := $(shell aws rds describe-db-clusters --db-cluster-identifier $(DEPLOYMENT_NAME)-cluster --region $(AWS_REGION) --query "DBClusters[0].Endpoint" --output text))
 	@echo "PostgreSQL Connection String:"
 	@echo "postgresql://$(POSTGRES_MASTER_USERNAME):$(POSTGRES_MASTER_PASSWORD)@$(ENDPOINT):5432/postgres"
 
 # Usage: make test-db-link RDS_ENDPOINT=xyz.cluster-123.us-east-1.rds.amazonaws.com
 .PHONY: test-aurora-from-eks
 test-aurora-from-eks:
-	$(eval ENDPOINT := $(shell aws rds describe-db-clusters --db-cluster-identifier $(DEPLOYMENT_NAME)-cluster --query "DBClusters[0].Endpoint" --output text))
+	$(eval ENDPOINT := $(shell aws rds describe-db-clusters --db-cluster-identifier $(DEPLOYMENT_NAME)-cluster --region $(AWS_REGION) --query "DBClusters[0].Endpoint" --output text))
 	@echo "Testing connectivity to $(ENDPOINT)..."
 	kubectl run db-ping-test --rm -it --image=busybox --restart=Never -- \
 		nc -zv -w 5 $(ENDPOINT) 5432

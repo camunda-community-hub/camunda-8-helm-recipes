@@ -68,6 +68,20 @@ use-kube:
 	gcloud config set project $(GCP_PROJECT)
 	gcloud container clusters get-credentials $(DEPLOYMENT_NAME) --region $(GCP_REGION)
 
+.PHONY: connect-gke
+connect-gke:
+	@echo "--- Connecting to GKE ---"
+	@gcloud auth list --filter=status:ACTIVE --format="value(account)" 2>/dev/null | grep -q "@" || \
+		(echo "GCP session expired. Re-authenticating..." && gcloud auth login)
+	gcloud config set project $(GCP_PROJECT)
+	gcloud container clusters get-credentials $(DEPLOYMENT_NAME) --region $(GCP_REGION)
+	@echo ""
+	@echo "✅ Active cloud:  GCP (Google Cloud)"
+	@echo "   Project:       $$(gcloud config get-value project 2>/dev/null)"
+	@echo "   Account:       $$(gcloud auth list --filter=status:ACTIVE --format='value(account)' 2>/dev/null)"
+	@echo "   Cluster:       $(DEPLOYMENT_NAME) [$(GCP_REGION)]"
+	@echo "   kubectl ctx:   $$(kubectl config current-context 2>/dev/null)"
+
 .PHONY: urls
 urls:
 	@echo "Cluster: https://console.cloud.google.com/kubernetes/clusters/details/$(GCP_REGION)/$(DEPLOYMENT_NAME)/details?project=$(GCP_PROJECT)"

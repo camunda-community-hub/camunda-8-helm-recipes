@@ -56,6 +56,21 @@ use-kube:
 	kubectl config unset users.clusterUser_$(DEPLOYMENT_NAME)-rg_$(DEPLOYMENT_NAME)
 	az aks get-credentials --resource-group $(DEPLOYMENT_NAME)-rg --name $(DEPLOYMENT_NAME)
 
+.PHONY: connect-aks
+connect-aks:
+	@echo "--- Connecting to AKS ---"
+	@az account show > /dev/null 2>&1 || \
+		(echo "Azure session expired. Re-authenticating..." && az login)
+	kubectl config unset clusters.$(DEPLOYMENT_NAME)
+	kubectl config unset users.clusterUser_$(DEPLOYMENT_NAME)-rg_$(DEPLOYMENT_NAME)
+	az aks get-credentials --resource-group $(DEPLOYMENT_NAME)-rg --name $(DEPLOYMENT_NAME)
+	@echo ""
+	@echo "✅ Active cloud:  Azure (Microsoft Azure)"
+	@echo "   Subscription:  $$(az account show --query 'name' -o tsv 2>/dev/null)"
+	@echo "   Account:       $$(az account show --query 'user.name' -o tsv 2>/dev/null)"
+	@echo "   Cluster:       $(DEPLOYMENT_NAME) [$(AZURE_REGION)]"
+	@echo "   kubectl ctx:   $$(kubectl config current-context 2>/dev/null)"
+
 .PHONY: ingress-nginx-azure
 ingress-nginx-azure:
 	helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx

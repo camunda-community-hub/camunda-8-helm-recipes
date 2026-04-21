@@ -1,7 +1,8 @@
 CAMUNDA_RECIPES := \
   basic-ingress-nginx-tls \
   oidc-ingress-nginx-tls \
-  rdbms-postgres
+  rdbms-postgres \
+  rdbms-postgres-oidc
 
 .PHONY: test
 test:

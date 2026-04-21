@@ -5,6 +5,7 @@ DEPLOYMENT_NAME ?= mydeployment
 
 # Cloud environment and K8s cluster
 AWS_REGION ?= ca-central-1
+
 AWS_ZONES ?= 'ca-central-1a' 'ca-central-1b'
 #AWS_ZONES ?= ('us-east-1a' 'us-east-1b')
 # This syntax is good for bash, but not good in cluster.yaml
@@ -34,4 +35,7 @@ POSTGRES_MODELER_USERNAME ?= modeler
 POSTGRES_CAMUNDA_DB ?= camunda
 POSTGRES_CAMUNDA_USERNAME ?= camunda
 
-DEFAULT_PASSWORD ?= demo
+DEFAULT_PASSWORD ?= changeme
+
+# Route 53 hosted zone name for the domain used by HOST_NAME (override in root config.mk)
+HOSTED_ZONE_NAME ?= example.com
