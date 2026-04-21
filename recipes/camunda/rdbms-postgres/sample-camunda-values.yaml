@@ -9,7 +9,7 @@ orchestration:
     secondaryStorage:
       type: rdbms
       rdbms:
-        url: jdbc:postgresql://:5432/camunda
+        url: jdbc:postgresql://mypostgresql.camunda.com:5432/camunda
         username: camunda
         secret:
           existingSecret: camunda-credentials
