@@ -1,0 +1,59 @@
+# OIDC authentication via Keycloak
+# Centralises all OIDC-related config: authentication method, issuer URLs,
+# client secrets / redirect URLs for every component, and the Identity→Keycloak
+# admin connection.
+#
+# Combine with ONE of:
+#   identity-keycloak-internal-postgres.yaml  (bundled PostgreSQL)
+#   identity-keycloak-external-postgres.yaml  (external PostgreSQL)
+
+global:
+  security:
+    authentication:
+      method: oidc
+  identity:
+    auth:
+      publicIssuerUrl: <KEYCLOAK_EXT_URL>/auth/realms/<KEYCLOAK_REALM>
+      issuerBackendUrl: http://camunda-keycloak/auth/realms/<KEYCLOAK_REALM>
+      authUrl: <KEYCLOAK_EXT_URL>/auth/realms/<KEYCLOAK_REALM>/protocol/openid-connect/auth
+      tokenUrl: http://camunda-keycloak/auth/realms/<KEYCLOAK_REALM>/protocol/openid-connect/token
+      jwksUrl: http://camunda-keycloak/auth/realms/<KEYCLOAK_REALM>/protocol/openid-connect/certs
+
+      identity:
+        redirectUrl: <IDENTITY_EXT_URL>/management
+
+      orchestration:
+        secret:
+          existingSecret: camunda-credentials
+          existingSecretKey: identity-orchestration-client-token
+        redirectUrl: <ORCHESTRATION_EXT_URL>/orchestration
+
+      # Currently required by Identity even when Optimize is disabled
+      optimize:
+        secret:
+          existingSecret: camunda-credentials
+          existingSecretKey: identity-optimize-client-token
+
+      webModeler:
+        redirectUrl: <WEB_MODELER_EXT_URL>/modeler
+
+    keycloak:
+      url:
+        protocol: http
+        host: camunda-keycloak
+        port: 80
+      # contextPath defaults to /auth
+      realm: /realms/<KEYCLOAK_REALM>
+      auth:
+        adminUser: <KEYCLOAK_ADMIN_USERNAME>
+        existingSecret: "camunda-credentials"
+        existingSecretKey: "identity-keycloak-admin-password"
+
+connectors:
+  security:
+    authentication:
+      method: oidc
+      oidc:
+        secret:
+          existingSecret: camunda-credentials
+          existingSecretKey: identity-connectors-client-token

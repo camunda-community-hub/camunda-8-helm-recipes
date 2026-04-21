@@ -1,0 +1,241 @@
+# =============================================================================
+# Traefik IngressRoute CRDs for Camunda Platform
+# Generated from template — do not edit directly.
+# Placeholders are substituted by `make ingress-routes.yaml`
+# (via makefiles/gateway-traefik.mk).
+#
+# Uses a single domain <YOUR_HOSTNAME> with context-path routing,
+# consistent with the nginx ingress recipes.
+# =============================================================================
+
+# 1. HTTP -> HTTPS redirect
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: <CAMUNDA_RELEASE_NAME>-platform-routes-http
+  namespace: <CAMUNDA_NAMESPACE>
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`<YOUR_HOSTNAME>`)
+      kind: Rule
+      middlewares:
+        - name: https-redirect
+          namespace: <CAMUNDA_NAMESPACE>
+      services:
+        - name: <CAMUNDA_RELEASE_NAME>-identity
+          port: 80
+
+---
+# 2. Main HTTPS Routes
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: <CAMUNDA_RELEASE_NAME>-platform-routes
+  namespace: <CAMUNDA_NAMESPACE>
+spec:
+  entryPoints:
+    - websecure
+  tls:
+    secretName: <TLS_SECRET_NAME>
+  routes:
+    # Orchestration — Tasklist, Operate, REST API (higher priority)
+    - match: Host(`<YOUR_HOSTNAME>`) &&
+         (PathPrefix(`/orchestration/tasklist`) ||
+          PathPrefix(`/orchestration/operate`) ||
+          PathPrefix(`/orchestration/api`))
+      kind: Rule
+      priority: 100
+      middlewares:
+        - name: forward-https-headers
+          namespace: <CAMUNDA_NAMESPACE>
+      services:
+        - name: <CAMUNDA_RELEASE_NAME>-zeebe-gateway
+          port: 8080
+
+    # SSO callback rewrite
+    - match: Host(`<YOUR_HOSTNAME>`) && Path(`/sso-callback`)
+      kind: Rule
+      middlewares:
+        - name: forward-https-headers
+          namespace: <CAMUNDA_NAMESPACE>
+        - name: sso-rewrite
+          namespace: <CAMUNDA_NAMESPACE>
+      services:
+        - name: <CAMUNDA_RELEASE_NAME>-zeebe-gateway
+          port: 8080
+
+    # Orchestration Cluster — catch-all /orchestration
+    - match: Host(`<YOUR_HOSTNAME>`) && PathPrefix(`/orchestration`)
+      kind: Rule
+      middlewares:
+        - name: forward-https-headers
+          namespace: <CAMUNDA_NAMESPACE>
+      services:
+        - name: <CAMUNDA_RELEASE_NAME>-zeebe-gateway
+          port: 8080
+
+    # Spring Security OAuth2 paths
+    - match: Host(`<YOUR_HOSTNAME>`) && PathPrefix(`/oauth2`)
+      kind: Rule
+      middlewares:
+        - name: forward-https-headers
+          namespace: <CAMUNDA_NAMESPACE>
+      services:
+        - name: <CAMUNDA_RELEASE_NAME>-zeebe-gateway
+          port: 8080
+
+    # Spring Security login path
+    - match: Host(`<YOUR_HOSTNAME>`) && PathPrefix(`/login`)
+      kind: Rule
+      middlewares:
+        - name: forward-https-headers
+          namespace: <CAMUNDA_NAMESPACE>
+      services:
+        - name: <CAMUNDA_RELEASE_NAME>-zeebe-gateway
+          port: 8080
+
+    # Keycloak — served at /auth on the same domain
+    - match: Host(`<YOUR_HOSTNAME>`) && PathPrefix(`/auth`)
+      kind: Rule
+      middlewares:
+        - name: forward-https-headers
+          namespace: <CAMUNDA_NAMESPACE>
+      services:
+        - name: <CAMUNDA_RELEASE_NAME>-keycloak
+          port: 80
+
+    # Identity
+    - match: Host(`<YOUR_HOSTNAME>`) && PathPrefix(`/management`)
+      kind: Rule
+      middlewares:
+        - name: forward-https-headers
+          namespace: <CAMUNDA_NAMESPACE>
+      services:
+        - name: <CAMUNDA_RELEASE_NAME>-identity
+          port: 80
+
+    # Optimize
+    - match: Host(`<YOUR_HOSTNAME>`) && PathPrefix(`/optimize`)
+      kind: Rule
+      middlewares:
+        - name: forward-https-headers
+          namespace: <CAMUNDA_NAMESPACE>
+      services:
+        - name: <CAMUNDA_RELEASE_NAME>-optimize
+          port: 80
+
+    # Connectors
+    - match: Host(`<YOUR_HOSTNAME>`) && PathPrefix(`/connectors`)
+      kind: Rule
+      middlewares:
+        - name: forward-https-headers
+          namespace: <CAMUNDA_NAMESPACE>
+      services:
+        - name: <CAMUNDA_RELEASE_NAME>-connectors
+          port: 8080
+
+    # Web Modeler webapp
+    - match: Host(`<YOUR_HOSTNAME>`) && PathPrefix(`/modeler`)
+      kind: Rule
+      middlewares:
+        - name: forward-https-headers
+          namespace: <CAMUNDA_NAMESPACE>
+      services:
+        - name: <CAMUNDA_RELEASE_NAME>-web-modeler-webapp
+          port: 80
+
+    # Web Modeler WebSocket
+    - match: Host(`<YOUR_HOSTNAME>`) && PathPrefix(`/modeler-ws`)
+      kind: Rule
+      middlewares:
+        - name: forward-https-headers
+          namespace: <CAMUNDA_NAMESPACE>
+      services:
+        - name: <CAMUNDA_RELEASE_NAME>-web-modeler-websockets
+          port: 80
+
+    # Console
+    - match: Host(`<YOUR_HOSTNAME>`) && PathPrefix(`/console`)
+      kind: Rule
+      middlewares:
+        - name: forward-https-headers
+          namespace: <CAMUNDA_NAMESPACE>
+      services:
+        - name: <CAMUNDA_RELEASE_NAME>-console
+          port: 80
+
+    # Root — redirect to Identity
+    - match: Host(`<YOUR_HOSTNAME>`) && Path(`/`)
+      kind: Rule
+      middlewares:
+        - name: redirect-to-management
+          namespace: <CAMUNDA_NAMESPACE>
+      services:
+        - name: <CAMUNDA_RELEASE_NAME>-identity
+          port: 80
+
+---
+# 3. Zeebe gRPC — separate subdomain grpc.<YOUR_HOSTNAME>
+apiVersion: traefik.io/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: <CAMUNDA_RELEASE_NAME>-zeebe-grpc
+  namespace: <CAMUNDA_NAMESPACE>
+spec:
+  entryPoints:
+    - websecure
+  tls:
+    secretName: <TLS_SECRET_NAME>
+    passthrough: false
+  routes:
+    - match: HostSNI(`grpc.<YOUR_HOSTNAME>`)
+      services:
+        - name: <CAMUNDA_RELEASE_NAME>-zeebe-gateway
+          port: 26500
+
+---
+# 4. Middlewares
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: redirect-to-management
+  namespace: <CAMUNDA_NAMESPACE>
+spec:
+  redirectRegex:
+    regex: "^https://<YOUR_HOSTNAME>/$"
+    replacement: "https://<YOUR_HOSTNAME>/management/"
+    permanent: false
+
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: https-redirect
+  namespace: <CAMUNDA_NAMESPACE>
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true
+
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: forward-https-headers
+  namespace: <CAMUNDA_NAMESPACE>
+spec:
+  headers:
+    customRequestHeaders:
+      X-Forwarded-Proto: "https"
+
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: sso-rewrite
+  namespace: <CAMUNDA_NAMESPACE>
+spec:
+  replacePath:
+    path: /orchestration/sso-callback

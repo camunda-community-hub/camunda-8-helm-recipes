@@ -1,0 +1,31 @@
+console:
+  enabled: true
+  contextPath: "/console"
+  overrideConfiguration: |
+    camunda:
+      console:
+        managed:
+          releases:
+            - name: "camunda"
+              namespace: "<CAMUNDA_NAMESPACE>"
+              components:
+                - id: "console"
+                  url: "<CONSOLE_EXT_URL>/console"
+                - id: "keycloak"
+                  url: "<KEYCLOAK_EXT_URL>/auth"
+                - id: "identity"
+                  url: "<IDENTITY_EXT_URL>/management"
+                - id: "webModelerWebApp"
+                  url: "<WEB_MODELER_EXT_URL>/modeler"
+                - id: "optimize"
+                  url: "<OPTIMIZE_EXT_URL>/optimize"
+                - id: "connectors"
+                  url: "<ORCHESTRATION_EXT_URL>/connectors"
+                - id: "operate"
+                  url: "<ORCHESTRATION_EXT_URL>/orchestration/operate"
+                - id: "tasklist"
+                  url: "<ORCHESTRATION_EXT_URL>/orchestration/tasklist"
+                - id: "orchestration"
+                  urls:
+                    grpc: "https://grpc.<YOUR_HOSTNAME>:443"
+                    http: "<ORCHESTRATION_EXT_URL>/orchestration"

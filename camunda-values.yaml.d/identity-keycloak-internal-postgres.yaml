@@ -1,42 +1,15 @@
-global:
-  security:
-    authentication:
-      method: oidc
-  identity:
-    auth:
-      enabled: true
-      publicIssuerUrl: <KEYCLOAK_EXT_URL>/auth/realms/<KEYCLOAK_REALM>
-      issuerBackendUrl: http://camunda-keycloak/auth/realms/<KEYCLOAK_REALM>
-      authUrl: <KEYCLOAK_EXT_URL>/auth/realms/<KEYCLOAK_REALM>/protocol/openid-connect/auth
-      tokenUrl: http://camunda-keycloak/auth/realms/<KEYCLOAK_REALM>/protocol/openid-connect/token
-      jwksUrl: http://camunda-keycloak/auth/realms/<KEYCLOAK_REALM>/protocol/openid-connect/certs
-
-      identity:
-        redirectUrl: <IDENTITY_EXT_URL>/management
-
-      # if optimize is disabled, then this shouldn't be required,
-      # but this is a known issue that, currently, identity requires this even if optimize is disabled.
-      optimize:
-        secret:
-          existingSecret: camunda-credentials
-          existingSecretKey: identity-optimize-client-token
-      webModeler:
-        redirectUrl: <WEB_MODELER_EXT_URL>/modeler
-
-
-    # This defines how Identity authenticates to Keycloak admin API
-    # Identity will connect to Keycloak the first time it boots and create the camunda-platform realm
-    keycloak:
-      url:
-        protocol: http
-        host: camunda-keycloak
-        port: 80
-      contextPath: /auth
-      realm: /realms/<KEYCLOAK_REALM>
-      auth:
-        adminUser: <KEYCLOAK_ADMIN_USERNAME>
-        existingSecret: "camunda-credentials"
-        existingSecretKey: "identity-keycloak-admin-password"
+# Identity + Keycloak with internally provisioned PostgreSQL
+# Combine with oidc.yaml for OIDC authentication.
+# Mutually exclusive with identity-keycloak-external-postgres.yaml.
+#
+# Defaults already provide:
+#   identity.externalDatabase.enabled: false # only needed for resource authorization, multi-tenancy, or an external identity provider (IdP)
+#   identityPostgresql.auth.username: identity
+#   identityPostgresql.auth.database: identity
+#   identityPostgresql.auth.secretKeys.adminPasswordKey: identity-postgresql-admin-password
+#   identityPostgresql.auth.secretKeys.userPasswordKey: identity-postgresql-user-password
+#   identityKeycloak.auth.existingSecret: camunda-credentials
+#   identityKeycloak.auth.passwordSecretKey: identity-keycloak-admin-password
 
 identity:
   enabled: true
@@ -49,31 +22,20 @@ identity:
   env:
     - name: KEYCLOAK_REALM
       value: <KEYCLOAK_REALM>
-  # Use internally provisioned postgresql database for identity
-  externalDatabase:
-    enabled: false
 
 identityPostgresql:
   enabled: true
   auth:
-    username: identity
-    database: identity
     existingSecret: camunda-credentials
-    secretKeys:
-      adminPasswordKey: identity-postgresql-admin-password
-      userPasswordKey: identity-postgresql-user-password
 
-# Keycloak will be installed and will use internally provisioned postgresql database
+# Keycloak will be installed and will use internally provisioned PostgreSQL database
 identityKeycloak:
   enabled: true
-  # This defines the admin user and password for Keycloak. Keycloak will create this user during first start
-  auth:
-    adminUser: <KEYCLOAK_ADMIN_USERNAME>
-    existingSecret: camunda-credentials
-    passwordSecretKey: identity-keycloak-admin-password
   postgresql:
     auth:
       existingSecret: camunda-credentials
+      # Override default key names so Keycloak's internal PostgreSQL
+      # shares the same secret keys as identityPostgresql:
       secretKeys:
         adminPasswordKey: identity-postgresql-admin-password
         userPasswordKey: identity-postgresql-user-password

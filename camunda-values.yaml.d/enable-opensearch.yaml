@@ -1,0 +1,15 @@
+# Enable external OpenSearch
+# elasticsearch and global.elasticsearch are already disabled by default.
+
+global:
+  opensearch:
+    enabled: true
+    url:
+      protocol: <OPENSEARCH_PROTOCOL>
+      host: <OPENSEARCH_HOST>
+      port: <OPENSEARCH_PORT>
+    auth:
+      username: <OPENSEARCH_USERNAME>
+      secret:
+        existingSecret: "camunda-credentials"
+        existingSecretKey: "opensearch-password"

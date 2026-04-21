@@ -1,0 +1,16 @@
+# Optimize connected to OpenSearch
+# Host/port/protocol/username fall back to global.opensearch settings
+# from enable-opensearch.yaml, so only component-specific overrides here.
+optimize:
+  enabled: true
+  contextPath: "/optimize"
+  database:
+    opensearch:
+      auth:
+        secret:
+          existingSecret: "camunda-credentials"
+          existingSecretKey: "opensearch-password"
+  security:
+    authentication:
+      oidc:
+        redirectRootUrl: "<ORCHESTRATION_EXT_URL>"

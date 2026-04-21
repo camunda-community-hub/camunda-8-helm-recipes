@@ -1,14 +1,14 @@
-webModelerPostgresql:
-  enabled: false
+# Web Modeler with external PostgreSQL database
+# webModelerPostgresql.enabled is already false by default.
 
 webModeler:
   restapi:
     externalDatabase:
       enabled: true
-      host: dave01-cluster.cluster-cjqkdcxqdsib.ca-central-1.rds.amazonaws.com
+      host: "<POSTGRES_MODELER_HOST>"
       port: 5432
-      database: <POSTGRES_MODELER_DB>
-      user: <POSTGRES_MODELER_USERNAME>
+      database: "<POSTGRES_MODELER_DB>"
+      user: "<POSTGRES_MODELER_USERNAME>"
       secret:
-        existingSecret: camunda-credentials
-        existingSecretKey: webmodeler-postgresql-user-password
+        existingSecret: "camunda-credentials"
+        existingSecretKey: "webmodeler-postgresql-user-password"

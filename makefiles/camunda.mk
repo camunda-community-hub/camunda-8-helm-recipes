@@ -80,15 +80,21 @@ camunda-values.yaml: delete-camunda-values
 	     s|<OPTIMIZE_EXT_URL>|$(OPTIMIZE_EXT_URL)|g; \
 	     s|<CONSOLE_EXT_URL>|$(CONSOLE_EXT_URL)|g; \
 	     s|<WEB_MODELER_EXT_URL>|$(WEB_MODELER_EXT_URL)|g; \
-	     s|<POSTGRES_HOST>|$(POSTGRES_HOST)|g; \
+	     s|<POSTGRES_KEYCLOAK_HOST>|$(POSTGRES_KEYCLOAK_HOST)|g; \
 	     s|<POSTGRES_KEYCLOAK_DB>|$(POSTGRES_KEYCLOAK_DB)|g; \
 	     s|<POSTGRES_KEYCLOAK_USERNAME>|$(POSTGRES_KEYCLOAK_USERNAME)|g; \
+	     s|<POSTGRES_MODELER_HOST>|$(POSTGRES_MODELER_HOST)|g; \
 	     s|<POSTGRES_MODELER_DB>|$(POSTGRES_MODELER_DB)|g; \
 	     s|<POSTGRES_MODELER_USERNAME>|$(POSTGRES_MODELER_USERNAME)|g; \
+	     s|<POSTGRES_CAMUNDA_HOST>|$(POSTGRES_CAMUNDA_HOST)|g; \
 	     s|<POSTGRES_CAMUNDA_DB>|$(POSTGRES_CAMUNDA_DB)|g; \
          s|<POSTGRES_CAMUNDA_USERNAME>|$(POSTGRES_CAMUNDA_USERNAME)|g; \
 	     s|<POSTGRES_IDENTITY_DB>|$(POSTGRES_IDENTITY_DB)|g; \
-	     s|<POSTGRES_IDENTITY_USERNAME>|$(POSTGRES_IDENTITY_USERNAME)|g;" \
+	     s|<POSTGRES_IDENTITY_USERNAME>|$(POSTGRES_IDENTITY_USERNAME)|g; \
+	     s|<OPENSEARCH_PROTOCOL>|$(OPENSEARCH_PROTOCOL)|g; \
+	     s|<OPENSEARCH_HOST>|$(OPENSEARCH_HOST)|g; \
+	     s|<OPENSEARCH_PORT>|$(OPENSEARCH_PORT)|g; \
+	     s|<OPENSEARCH_USERNAME>|$(OPENSEARCH_USERNAME)|g;" \
 	     > ./camunda-values.yaml
 
 .PHONY: create-camunda-credentials
@@ -107,6 +113,7 @@ create-camunda-credentials: namespace
 	  --from-literal=webmodeler-postgresql-admin-password=$(DEFAULT_PASSWORD) \
 	  --from-literal=webmodeler-postgresql-user-password=$(DEFAULT_PASSWORD) \
 	  --from-literal=orchestration-rdbms-password=$(DEFAULT_PASSWORD) \
+	  --from-literal=opensearch-password=$(OPENSEARCH_PASSWORD) \
 	  --namespace $(CAMUNDA_NAMESPACE)
 
 .PHONY: port-orchestration

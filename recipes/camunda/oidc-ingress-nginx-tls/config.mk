@@ -28,12 +28,12 @@ CAMUNDA_HELM_VALUES ?= \
   $(root)/camunda-values.yaml.d/enable-elasticsearch.yaml \
   $(root)/camunda-values.yaml.d/enable-ingress-nginx.yaml \
   $(root)/camunda-values.yaml.d/enable-metrics.yaml \
-  $(root)/camunda-values.yaml.d/connectors-oidc.yaml \
+  $(root)/camunda-values.yaml.d/connectors-enabled.yaml \
+  $(root)/camunda-values.yaml.d/oidc.yaml \
   $(root)/camunda-values.yaml.d/identity-keycloak-internal-postgres.yaml \
   $(root)/camunda-values.yaml.d/modeler-enabled.yaml \
   $(root)/camunda-values.yaml.d/modeler-internal-postgres.yaml \
   $(root)/camunda-values.yaml.d/orchestration-elasticsearch.yaml \
-  $(root)/camunda-values.yaml.d/orchestration-oidc.yaml \
   ./my-camunda-values.yaml
 
 DEFAULT_PASSWORD ?= demo
