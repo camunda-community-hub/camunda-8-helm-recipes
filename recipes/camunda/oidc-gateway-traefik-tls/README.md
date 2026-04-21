@@ -6,7 +6,7 @@ Keycloak is used for OIDC authentication. All components share a single domain w
 ## Features
 
 This recipe provides:
-- **Traefik IngressRoute CRDs** — HTTP→HTTPS redirect, path-based routing, gRPC passthrough for Zeebe
+- **Traefik IngressRoute CRDs** — HTTP→HTTPS redirect, path-based routing, gRPC routing for Zeebe
 - **Keycloak and Identity** — OIDC authentication with external PostgreSQL
 - **Orchestration Cluster** — Zeebe broker with embedded Operate & Tasklist
 - **Connectors** — with OIDC authentication
@@ -42,7 +42,7 @@ The `camunda-values.yaml` is composed from reusable fragments in [`camunda-value
 | `optimize-opensearch.yaml` | Optimize connected to OpenSearch |
 | `console-enabled.yaml` | Console with managed releases |
 
-See [`sample-camunda-values.yaml`](./sample-camunda-values.yaml) for additional overrides (resources, env vars).
+See [`my-camunda-values.yaml`](./my-camunda-values.yaml) for additional overrides (resources, env vars).
 
 ## Helm values file
 

@@ -13,4 +13,4 @@ optimize:
   security:
     authentication:
       oidc:
-        redirectRootUrl: "<ORCHESTRATION_EXT_URL>"
+        redirectRootUrl: "<OPTIMIZE_EXT_URL>"

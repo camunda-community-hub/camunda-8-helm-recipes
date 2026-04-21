@@ -1,4 +1,4 @@
-# Theses are the default values used by this recipe
+# These are the default values used by this recipe
 # Create a config.mk file in the root directory of this project to override variables for your specific environment
 
 DEPLOYMENT_NAME ?= mydeployment
@@ -64,4 +64,3 @@ REPLY_EMAIL ?= noreply@$(HOST_NAME)
 # Keycloak
 KEYCLOAK_ADMIN_USERNAME ?= admin
 KEYCLOAK_REALM ?= camunda-platform
-
