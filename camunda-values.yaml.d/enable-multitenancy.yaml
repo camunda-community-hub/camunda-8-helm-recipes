@@ -1,0 +1,14 @@
+global:
+  multitenancy:
+    enabled: true
+    
+orchestration:
+  multitenancy:
+    checks:
+      enabled: true
+    api:
+     enabled: true
+
+identity:
+  multitenancy:
+    enabled: true

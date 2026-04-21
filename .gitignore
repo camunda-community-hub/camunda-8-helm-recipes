@@ -3,3 +3,4 @@
 **/cluster.yaml
 /config.mk
 /recipes/tls-self-signed-certs/certs
+.DS_Store

@@ -1,19 +1,16 @@
-identity:
-  enabled: false
-identityPostgresql:
-  enabled: false
-identityKeycloak:
-  enabled: false
-console:
-  enabled: false
-webModeler:
-  enabled: false
-webModelerPostgresql:
-  enabled: false
-connectors:
+elasticsearch:
   enabled: true
+global:
+  ingress:
+    enabled: true
+    className: nginx
+    host: "example.camunda.com"
+    tls:
+      enabled: true
+      secretName: "tls-secret"
+  elasticsearch:
+    enabled: true
 orchestration:
-  enabled: true
   gateway:
     grpc:
       enabled: true
@@ -21,7 +18,7 @@ orchestration:
   ingress:
     grpc:
       enabled: true
-      host: "grpc.dave02.gke.c8sm.com"
+      host: "grpc.example.camunda.com"
       path: "/"
       tls:
         enabled: true
@@ -29,19 +26,7 @@ orchestration:
   data:
     secondaryStorage:
       type: elasticsearch
-optimize:
-  enabled: false
-elasticsearch:
-  enabled: true
-global:
-  ingress:
-    enabled: true
-    className: nginx
-    host: "dave02.gke.c8sm.com"
-    tls:
-      enabled: true
-      secretName: "tls-secret"
-  elasticsearch:
-    enabled: true
 prometheusServiceMonitor:
+  enabled: true
+connectors:
   enabled: true

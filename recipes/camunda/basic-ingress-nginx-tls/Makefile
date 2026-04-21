@@ -21,3 +21,4 @@ clean: clean-camunda
 include $(root)/makefiles/camunda.mk
 include $(root)/makefiles/letsencrypt.mk
 include $(root)/makefiles/ingress-nginx.mk
+include $(root)/makefiles/test.mk

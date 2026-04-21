@@ -21,3 +21,4 @@ clean: clean-camunda
 include $(root)/makefiles/aws-eks.mk
 include $(root)/makefiles/aws-aurora.mk
 include $(root)/makefiles/camunda.mk
+include $(root)/makefiles/test.mk

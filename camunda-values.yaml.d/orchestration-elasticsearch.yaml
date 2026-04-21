@@ -3,8 +3,6 @@ global:
     enabled: true
 
 orchestration:
-  enabled: true
-  contextPath: "/orchestration"
   data:
     secondaryStorage:
       type: elasticsearch

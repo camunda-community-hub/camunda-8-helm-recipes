@@ -1,8 +1,10 @@
+elasticsearch:
+  enabled: true
 global:
   ingress:
     enabled: true
     className: nginx
-    host: "dave01.gke.c8sm.com"
+    host: "example.camunda.com"
     tls:
       enabled: true
       secretName: "tls-secret"
@@ -12,13 +14,13 @@ global:
   identity:
     auth:
       enabled: true
-      publicIssuerUrl: https://dave01.gke.c8sm.com/auth/realms/camunda-platform
+      publicIssuerUrl: https://example.camunda.com/auth/realms/camunda-platform
       issuerBackendUrl: http://camunda-keycloak/auth/realms/camunda-platform
-      authUrl: https://dave01.gke.c8sm.com/auth/realms/camunda-platform/protocol/openid-connect/auth
+      authUrl: https://example.camunda.com/auth/realms/camunda-platform/protocol/openid-connect/auth
       tokenUrl: http://camunda-keycloak/auth/realms/camunda-platform/protocol/openid-connect/token
       jwksUrl: http://camunda-keycloak/auth/realms/camunda-platform/protocol/openid-connect/certs
       identity:
-        redirectUrl: https://dave01.gke.c8sm.com/management
+        redirectUrl: https://example.camunda.com/management
       # if optimize is disabled, then this shouldn't be required,
       # but this is a known issue that, currently, identity requires this even if optimize is disabled.
       optimize:
@@ -26,12 +28,12 @@ global:
           existingSecret: camunda-credentials
           existingSecretKey: identity-optimize-client-token
       webModeler:
-        redirectUrl: https://dave01.gke.c8sm.com/modeler
+        redirectUrl: https://example.camunda.com/modeler
       orchestration:
         secret:
           existingSecret: camunda-credentials
           existingSecretKey: identity-orchestration-client-token
-        redirectUrl: https://dave01.gke.c8sm.com/orchestration
+        redirectUrl: https://example.camunda.com/orchestration
     # This defines how Identity authenticates to Keycloak admin API
     # Identity will connect to Keycloak the first time it boots and create the camunda-platform realm
     keycloak:
@@ -47,11 +49,44 @@ global:
         existingSecretKey: "identity-keycloak-admin-password"
   elasticsearch:
     enabled: true
-
+  multitenancy:
+    enabled: true
+orchestration:
+  gateway:
+    grpc:
+      enabled: true
+  contextPath: "/orchestration"
+  ingress:
+    grpc:
+      enabled: true
+      host: "grpc.example.camunda.com"
+      path: "/"
+      tls:
+        enabled: true
+        secretName: "grpc-tls-secret"
+  data:
+    secondaryStorage:
+      type: elasticsearch
+  multitenancy:
+    checks:
+      enabled: true
+    api:
+      enabled: true
+prometheusServiceMonitor:
+  enabled: true
+connectors:
+  enabled: true
+  security:
+    authentication:
+      method: oidc
+      oidc:
+        secret:
+          existingSecret: camunda-credentials
+          existingSecretKey: identity-connectors-client-token
 identity:
   enabled: true
   contextPath: /management
-  fullURL: https://dave01.gke.c8sm.com/management
+  fullURL: https://example.camunda.com/management
   firstUser:
     secret:
       existingSecret: "camunda-credentials"
@@ -62,7 +97,8 @@ identity:
   # Use internally provisioned postgresql database for identity
   externalDatabase:
     enabled: false
-
+  multitenancy:
+    enabled: true
 identityPostgresql:
   enabled: true
   auth:
@@ -72,7 +108,6 @@ identityPostgresql:
     secretKeys:
       adminPasswordKey: identity-postgresql-admin-password
       userPasswordKey: identity-postgresql-user-password
-
 # Keycloak will be installed and will use internally provisioned postgresql database
 identityKeycloak:
   enabled: true
@@ -87,13 +122,9 @@ identityKeycloak:
       secretKeys:
         adminPasswordKey: identity-postgresql-admin-password
         userPasswordKey: identity-postgresql-user-password
-
-console:
-  enabled: false
-
 webModeler:
-  enabled: true
   contextPath: /modeler
+  enabled: true
   restapi:
     mail:
       # This value is required, otherwise the restapi pod wouldn't start.
@@ -121,7 +152,6 @@ webModeler:
         value: "DEBUG"
       - name: SPRING_PROFILES_INCLUDE
         value: "default-logging"
-
 webModelerPostgresql:
   enabled: true
   auth:
@@ -129,40 +159,3 @@ webModelerPostgresql:
     secretKeys:
       adminPasswordKey: webmodeler-postgresql-admin-password
       userPasswordKey: webmodeler-postgresql-user-password
-
-connectors:
-  enabled: true
-  security:
-    authentication:
-      method: oidc
-      oidc:
-        secret:
-          existingSecret: camunda-credentials
-          existingSecretKey: identity-connectors-client-token
-
-orchestration:
-  enabled: true
-  gateway:
-    grpc:
-      enabled: true
-  contextPath: "/orchestration"
-  ingress:
-    grpc:
-      enabled: true
-      host: "grpc.dave01.gke.c8sm.com"
-      path: "/"
-      tls:
-        enabled: true
-        secretName: "grpc-tls-secret"
-  data:
-    secondaryStorage:
-      type: elasticsearch
-
-optimize:
-  enabled: false
-
-elasticsearch:
-  enabled: true
-
-prometheusServiceMonitor:
-  enabled: true

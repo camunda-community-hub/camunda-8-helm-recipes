@@ -12,7 +12,6 @@ CAMUNDA_HELM_CHART_VERSION ?= 14.0.0-alpha5
 CAMUNDA_VERSION ?= 8.9.0-alpha5
 
 CAMUNDA_HELM_VALUES ?= \
-  $(root)/camunda-values.yaml.d/disable-all.yaml \
   $(root)/camunda-values.yaml.d/enable-elasticsearch.yaml \
   $(root)/camunda-values.yaml.d/enable-ingress-nginx.yaml \
   $(root)/camunda-values.yaml.d/enable-metrics.yaml \
@@ -20,7 +19,7 @@ CAMUNDA_HELM_VALUES ?= \
   $(root)/camunda-values.yaml.d/orchestration-elasticsearch.yaml \
   ./my-camunda-values.yaml
 
-DEFAULT_PASSWORD ?= demo
+DEFAULT_PASSWORD ?= changeme
 
 CAMUNDA_CLUSTER_SIZE ?= 1
 CAMUNDA_REPLICATION_FACTOR ?= 1
@@ -29,4 +28,5 @@ CAMUNDA_PARTITION_COUNT ?= 1
 # Networking
 CAMUNDA_INGRESS_NAME ?= camunda-camunda-platform-http
 CAMUNDA_INGRESS_GRPC_NAME ?= camunda-camunda-platform-grpc
-ORCHESTRATION_EXT_URL ?= http://localhost:8080
+
+HOST_NAME ?= example.camunda.com
