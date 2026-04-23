@@ -1,0 +1,7 @@
+# Helm chart values are imported from `../../../../camunda-values.yaml.d` via `config.mk`.
+# Add region0-specific overrides here (applied last in the merge order).
+# Note: array values (e.g. zeebe.env) CANNOT be merged — only the last file wins.
+#
+# In Camunda 8.9, Operate and Tasklist are bundled into the `orchestration` component.
+# They are auto-deployed and accessed via the camunda-zeebe-gateway service on port 8080.
+# There are no separate operate/tasklist chart keys to enable here.

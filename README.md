@@ -31,6 +31,10 @@ The [camunda-values.yaml.d](./camunda-values.yaml.d) directory contains reusable
 
 The [recipes](./recipes) directory combines `Makefiles` and `camunda-values.yaml` files to support specific use cases.
 
+### Dual-Region (AWS EKS)
+
+[`recipes/aws/eks-dual-region/`](./recipes/aws/eks-dual-region/) provisions two AWS EKS clusters with VPC peering and CoreDNS chaining for a dual-region Camunda 8.9 deployment. [`recipes/camunda/dual-region-rdbms-postgres/`](./recipes/camunda/dual-region-rdbms-postgres/) deploys Camunda across both clusters using Aurora PostgreSQL as the secondary store (no Elasticsearch required). See the recipe [README](./recipes/aws/eks-dual-region/README.md) and [operations playbook](./recipes/aws/eks-dual-region/docs/eks-dual-region-playbook.md) for details.
+
 ## How does it work?
 
 Each recipe contains a `Makefile` which makes use of `make` targets from files found inside [makefiles](./makefiles) directory. `make` targets use command line tools and bash scripts to accomplish the work of each profile. For example, [makefiles/camunda.mk](./makefiles/camunda.mk) defines a `make` target `make camunda`, which will install Camunda via Helm charts. 
