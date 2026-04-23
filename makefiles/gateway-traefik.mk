@@ -43,7 +43,7 @@ traefik-dashboard:
 # IngressRoute management
 # ---------------------------------------------------------------------------
 
-ingress-routes.yaml: ./include/ingress-routes.tpl.yaml
+ingress-routes.yaml: $(root)/recipes/gateway-traefik/include/ingress-routes.tpl.yaml
 	@echo "Generating ingress-routes.yaml from template ..."
 	sed "s|<YOUR_HOSTNAME>|$(HOST_NAME)|g; \
 	     s|<CAMUNDA_NAMESPACE>|$(CAMUNDA_NAMESPACE)|g; \
