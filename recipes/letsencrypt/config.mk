@@ -1,0 +1,3 @@
+CERT_MANAGER_EMAIL ?= CHANGME@camunda.com
+INGRESS_CLASS ?= nginx 
+#INGRESS_CLASS ?= traefik

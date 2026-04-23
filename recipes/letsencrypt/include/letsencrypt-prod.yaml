@@ -16,7 +16,7 @@ spec:
     solvers:
     - http01:
         ingress:
-          class: nginx
+          class: <INGRESS_CLASS>
           podTemplate:
             spec:
               nodeSelector:

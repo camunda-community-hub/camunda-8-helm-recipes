@@ -1,5 +1,6 @@
 # https://cert-manager.io/docs/tutorials/acme/nginx-ingress/
 LETSENCRYPT_PROD_URL ?= https:\\/\\/acme-v02.api.letsencrypt.org/directory
+INGRESS_CLASS ?= nginx
 
 .PHONY: cert-manager
 cert-manager:
@@ -13,11 +14,17 @@ cert-manager:
 
 .PHONY: letsencrypt-staging
 letsencrypt-staging:
-	cat $(root)/recipes/letsencrypt/include/letsencrypt-stage.yaml | sed -E "s/<CERT_MANAGER_EMAIL>/$(CERT_MANAGER_EMAIL)/g" | kubectl apply -n cert-manager -f -
+	cat $(root)/recipes/letsencrypt/include/letsencrypt-stage.yaml | \
+	sed -E "s/<CERT_MANAGER_EMAIL>/$(CERT_MANAGER_EMAIL)/g; \
+	        s|<INGRESS_CLASS>|$(INGRESS_CLASS)|g" | \
+	kubectl apply -n cert-manager -f -
 
 .PHONY: letsencrypt-prod
 letsencrypt-prod:
-	cat $(root)/recipes/letsencrypt/include/letsencrypt-prod.yaml | sed -E "s/<CERT_MANAGER_EMAIL>/$(CERT_MANAGER_EMAIL)/g" | kubectl apply -n cert-manager -f -
+	cat $(root)/recipes/letsencrypt/include/letsencrypt-prod.yaml | \
+	sed -E "s/<CERT_MANAGER_EMAIL>/$(CERT_MANAGER_EMAIL)/g; \
+	        s|<INGRESS_CLASS>|$(INGRESS_CLASS)|g" | \
+	kubectl apply -n cert-manager -f -
 
 #TODO: succeeds, but does not seem to have right effect
 .PHONY: letsencrypt-prod-patch
@@ -63,6 +70,22 @@ cacerts-staging:
 	-kubectl create secret generic "cacerts-staging" \
 	--namespace=$(CAMUNDA_NAMESPACE) \
 	--from-file=cacerts_staging=$(root)/recipes/letsencrypt/include/cacerts_staging
+
+# Request a TLS certificate via cert-manager for Traefik IngressRoute (or any gateway that
+# uses a named TLS secret rather than Ingress annotations).
+# Requires: ClusterIssuer named 'letsencrypt', DNS pointing to the load balancer IP.
+.PHONY: request-certificate
+request-certificate:
+	cat $(root)/recipes/letsencrypt/include/certificate.yaml | \
+	sed -E "s|<CAMUNDA_NAMESPACE>|$(CAMUNDA_NAMESPACE)|g; \
+	        s|<TLS_SECRET_NAME>|$(TLS_SECRET_NAME)|g; \
+	        s|<YOUR_HOSTNAME>|$(HOST_NAME)|g" | \
+	kubectl apply -f -
+
+.PHONY: delete-certificate
+delete-certificate:
+	-kubectl delete certificate camunda-tls -n $(CAMUNDA_NAMESPACE)
+	-kubectl delete secret $(TLS_SECRET_NAME) -n $(CAMUNDA_NAMESPACE)
 
 .PHONY: get-cert-requests
 get-cert-requests:
