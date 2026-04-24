@@ -33,8 +33,7 @@ ebs-csi-controller-addon: ebs-csi-attach-role-policy create-ebs-csi-addon annota
 fetch-id-values:
 	@echo "Fetching OIDC and account identifiers..."
 	$(eval oidc_id := $(shell aws eks describe-cluster --name $(DEPLOYMENT_NAME) --region $(AWS_REGION) --query "cluster.identity.oidc.issuer" --output text | cut -d '/' -f 5))
-	$(eval account_id_value := $(shell aws sts get-caller-identity | grep Account | cut -d ':' -f 2))
-	$(eval account_id := $(shell echo $(account_id_value) | tr -d ',' ))
+	$(eval account_id := $(shell aws sts get-caller-identity --query Account --output text))
 
 .PHONY: create-ebs-csi-controller-role-def
 create-ebs-csi-controller-role-def:fetch-id-values
@@ -87,7 +86,7 @@ kube-aws: cluster.yaml
 	kubectl patch storageclass gp2 -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
 
 .PHONY: kube
-kube: kube-aws oidc-provider install-ebs-csi-controller-addon
+kube: kube-aws
 
 .PHONY: kube-upgrade
 kube-upgrade:

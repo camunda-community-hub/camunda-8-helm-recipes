@@ -6,6 +6,14 @@ metadata:
   region: <REGION>
   version: "<CLUSTER_VERSION>"
 
+iam:
+  withOIDC: true
+
+addons:
+  - name: aws-ebs-csi-driver
+    wellKnownPolicies:
+      ebsCSIController: true
+
 managedNodeGroups:
   - name: ng-1
     instanceType: <MACHINE_TYPE>
