@@ -31,6 +31,7 @@ camunda-8-helm-recipes/
 │   ├── kind/                    # Local Kind cluster
 │   ├── aws/eks/                 # AWS EKS cluster
 │   ├── aws/eks-and-aurora-postgres/
+│   ├── aws/eks-dual-region/     # Dual-region EKS with VPC peering + CoreDNS chaining
 │   ├── azure/aks/               # Azure AKS cluster
 │   ├── google/gke/              # Google GKE cluster
 │   ├── tls-self-signed-certs/   # Self-signed cert generation
