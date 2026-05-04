@@ -38,6 +38,9 @@ global:
       webModeler:
         redirectUrl: <WEB_MODELER_EXT_URL>/modeler
 
+      console:
+        redirectUrl: <CONSOLE_EXT_URL>/console 
+
     keycloak:
       url:
         protocol: http
