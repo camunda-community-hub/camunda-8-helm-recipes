@@ -28,4 +28,8 @@ webModeler:
         value: "DEBUG"
       - name: SPRING_PROFILES_INCLUDE
         value: "default-logging"
+      - name: CAMUNDA_MODELER_GITSYNC_GITHUB_BASEURL
+        value: https://api.github.com
+      - name: CAMUNDA_MODELER_GITSYNC_MAXFILES
+        value: "50"
 
