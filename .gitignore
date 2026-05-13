@@ -6,3 +6,4 @@
 .DS_Store
 **/ebs-csi-driver-trust-policy.json
 **/ingress-routes.yaml
+**/*.bk.yaml
