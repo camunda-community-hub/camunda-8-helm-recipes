@@ -101,6 +101,12 @@ camunda-values.yaml: delete-camunda-values
 	     s|<RESTAPI_COPILOT_VERTEX_AI_LOCATION>|$(RESTAPI_COPILOT_VERTEX_AI_LOCATION)|g;" \
 	     > ./camunda-values.yaml
 
+# Stable Pusher credentials for Web Modeler. Recipes that wire
+# webModeler.restapi.pusher.{secret,client.secret}.existingSecret -> camunda-credentials
+# read these keys. Override per-recipe if you want non-demo values.
+WEBMODELER_PUSHER_APP_KEY ?= webmodeler-pusher-key-changeme
+WEBMODELER_PUSHER_APP_SECRET ?= webmodeler-pusher-secret-changeme
+
 .PHONY: create-camunda-credentials
 create-camunda-credentials: namespace
 	-kubectl delete secret camunda-credentials --namespace $(CAMUNDA_NAMESPACE)
@@ -116,6 +122,8 @@ create-camunda-credentials: namespace
 	  --from-literal=identity-postgresql-user-password=$(DEFAULT_PASSWORD) \
 	  --from-literal=webmodeler-postgresql-admin-password=$(DEFAULT_PASSWORD) \
 	  --from-literal=webmodeler-postgresql-user-password=$(DEFAULT_PASSWORD) \
+	  --from-literal=webmodeler-pusher-app-key=$(WEBMODELER_PUSHER_APP_KEY) \
+	  --from-literal=webmodeler-pusher-app-secret=$(WEBMODELER_PUSHER_APP_SECRET) \
 	  --from-literal=orchestration-rdbms-password=$(DEFAULT_PASSWORD) \
 	  --from-literal=opensearch-password=$(OPENSEARCH_PASSWORD) \
 	  --namespace $(CAMUNDA_NAMESPACE)

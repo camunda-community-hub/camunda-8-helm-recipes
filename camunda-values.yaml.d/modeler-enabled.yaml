@@ -1,11 +1,42 @@
 webModeler:
   contextPath: /modeler
   enabled: true
+  # WebSocket public reachability for the browser client.
+  # The chart only auto-fills these from global.ingress when global.ingress.enabled=true.
+  # Recipes that use Traefik IngressRoute CRDs (no chart-managed Ingress) need them set here.
+  # For chart-managed Ingress recipes these are ignored — global.ingress.host wins.
+  websockets:
+    publicHost: <YOUR_HOSTNAME>
+    publicPort: 443
+    env:
+      # Tell the websocket server it is mounted at /modeler-ws so it accepts
+      # requests on that prefix instead of "/".
+      - name: PUSHER_APP_PATH
+        value: "/modeler-ws"
   restapi:
+    # Stable Pusher app key + secret sourced from the camunda-credentials secret
+    # so values do not rotate on `helm upgrade` (the chart otherwise regenerates
+    # them via randAlphaNum on every render). Both restapi and websockets
+    # consume the same refs, so they always agree.
+    pusher:
+      secret:
+        existingSecret: camunda-credentials
+        existingSecretKey: webmodeler-pusher-app-secret
+      client:
+        secret:
+          existingSecret: camunda-credentials
+          existingSecretKey: webmodeler-pusher-app-key
     mail:
       # This value is required, otherwise the restapi pod wouldn't start.
       fromAddress: noreply@example.com
     env:
+      # Override pusher.client.force-tls and pusher.client.path in the restapi's
+      # application.yaml. Required when global.ingress.enabled is false — the
+      # chart hard-codes force-tls=false and omits the path in that case.
+      - name: CAMUNDA_MODELER_PUSHER_CLIENT_FORCETLS
+        value: "true"
+      - name: CAMUNDA_MODELER_PUSHER_CLIENT_PATH
+        value: "/modeler-ws"
       - name: CAMUNDA_MODELER_CLUSTERS_0_ID
         value: "camunda-demo-cluster"
       - name: CAMUNDA_MODELER_CLUSTERS_0_NAME
