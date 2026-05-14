@@ -51,3 +51,27 @@ check-vertex-model:
 	  cat "$$RESP_BODY"; echo; \
 	  exit 1; \
 	fi
+
+.PHONY: save-modeler-restapi-logs # save logs from the web-modeler restapi pod(s) to ./logs/ (override dir with LOG_DIR=...)
+save-modeler-restapi-logs:
+	@LOG_DIR=$${LOG_DIR:-logs}; \
+	mkdir -p "$$LOG_DIR"; \
+	TS=$$(date -u +%Y%m%dT%H%M%SZ); \
+	PODS=$$(kubectl get pods -n $(CAMUNDA_NAMESPACE) \
+	  -l app.kubernetes.io/name=web-modeler,app.kubernetes.io/component=restapi \
+	  -o jsonpath='{.items[*].metadata.name}'); \
+	if [ -z "$$PODS" ]; then \
+	  echo "❌ No web-modeler restapi pods found in namespace $(CAMUNDA_NAMESPACE)"; \
+	  exit 1; \
+	fi; \
+	for POD in $$PODS; do \
+	  OUT="$$LOG_DIR/$$POD-$$TS.log"; \
+	  echo "📝 Saving logs: $$POD → $$OUT"; \
+	  kubectl logs -n $(CAMUNDA_NAMESPACE) "$$POD" > "$$OUT"; \
+	  PREV="$$LOG_DIR/$$POD-$$TS.previous.log"; \
+	  if kubectl logs -n $(CAMUNDA_NAMESPACE) "$$POD" --previous > "$$PREV" 2>/dev/null && [ -s "$$PREV" ]; then \
+	    echo "📝 Saving previous logs: $$POD → $$PREV"; \
+	  else \
+	    rm -f "$$PREV"; \
+	  fi; \
+	done
