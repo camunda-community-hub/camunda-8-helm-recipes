@@ -1,10 +1,8 @@
 # Optimize connected to Elasticsearch.
 # Host/port/protocol fall back to global.elasticsearch settings
 # from enable-elasticsearch.yaml, so only component-specific overrides here.
+# OIDC redirect for Optimize is configured via global.identity.auth.optimize.redirectUrl
+# in oidc.yaml — the chart maps that to ccsm.redirectRootUrl in Optimize's app config.
 optimize:
   enabled: true
   contextPath: "/optimize"
-  security:
-    authentication:
-      oidc:
-        redirectRootUrl: "<OPTIMIZE_EXT_URL>"

@@ -1,6 +1,8 @@
 # Optimize connected to OpenSearch
 # Host/port/protocol/username fall back to global.opensearch settings
 # from enable-opensearch.yaml, so only component-specific overrides here.
+# OIDC redirect for Optimize is configured via global.identity.auth.optimize.redirectUrl
+# in oidc.yaml — the chart maps that to ccsm.redirectRootUrl in Optimize's app config.
 optimize:
   enabled: true
   contextPath: "/optimize"
@@ -10,7 +12,3 @@ optimize:
         secret:
           existingSecret: "camunda-credentials"
           existingSecretKey: "opensearch-password"
-  security:
-    authentication:
-      oidc:
-        redirectRootUrl: "<OPTIMIZE_EXT_URL>"

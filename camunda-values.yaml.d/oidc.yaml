@@ -29,11 +29,15 @@ global:
           existingSecretKey: identity-orchestration-client-token
         redirectUrl: <ORCHESTRATION_EXT_URL>/orchestration
 
-      # Currently required by Identity even when Optimize is disabled
+      # The secret is required by Identity even when Optimize is disabled.
+      # redirectUrl is consumed by the Optimize chart template
+      # (global.identity.auth.optimize.redirectUrl -> ccsm.redirectRootUrl)
+      # and is harmless when Optimize is disabled.
       optimize:
         secret:
           existingSecret: camunda-credentials
           existingSecretKey: identity-optimize-client-token
+        redirectUrl: <OPTIMIZE_EXT_URL>/optimize
 
       webModeler:
         redirectUrl: <WEB_MODELER_EXT_URL>/modeler
