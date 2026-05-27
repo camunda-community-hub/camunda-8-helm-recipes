@@ -1,49 +1,44 @@
-# Enable external OpenSearch
-# elasticsearch and global.elasticsearch are already disabled by default.
-
-# Orchestration cluster configured for OpenSearch as secondary storage.
-# Zeebe exports to OpenSearch; Operate and Tasklist read from OpenSearch
-# Combine this with enable-opensearch.yaml which configures global.opensearch.*
+# Helm chart values are imported from `../../camunda-values.yaml.d` via `config.mk`.
+# This file only contains additional overrides.
+# Note that array values, e.g. `orchestration.env` can NOT be merged by Helm.
+elasticsearch:
+  enabled: true
+prometheusServiceMonitor:
+  enabled: true
+  labels:
+    release: metrics
 global:
-  opensearch:
-    enabled: true
-    url:
-      protocol: http
-      host: opensearch-cluster-master.shared-services.svc.cluster.local
-      port: 9200
-    auth:
-      username: admin
-      secret:
-        existingSecret: "camunda-credentials"
-        existingSecretKey: "opensearch-password"
   security:
     authentication:
       method: oidc
   identity:
     auth:
+      enabled: true
       publicIssuerUrl: https://example.com/auth/realms/camunda-platform
       issuerBackendUrl: http://camunda-keycloak/auth/realms/camunda-platform
       authUrl: https://example.com/auth/realms/camunda-platform/protocol/openid-connect/auth
       tokenUrl: http://camunda-keycloak/auth/realms/camunda-platform/protocol/openid-connect/token
       jwksUrl: http://camunda-keycloak/auth/realms/camunda-platform/protocol/openid-connect/certs
       identity:
-        redirectUrl: https://example.com/identity
+        redirectUrl: https://example.com/management
       orchestration:
         secret:
           existingSecret: camunda-credentials
           existingSecretKey: identity-orchestration-client-token
         redirectUrl: https://example.com/orchestration
-      # if optimize is disabled, then this shouldn't be required,
-      # but this is a known issue that, currently, identity requires this even if optimize is disabled.
+      # The secret is required by Identity even when Optimize is disabled.
+      # redirectUrl is consumed by the Optimize chart template
+      # (global.identity.auth.optimize.redirectUrl -> ccsm.redirectRootUrl)
+      # and is harmless when Optimize is disabled.
       optimize:
         secret:
           existingSecret: camunda-credentials
           existingSecretKey: identity-optimize-client-token
+        redirectUrl: https://example.com/optimize
       webModeler:
         redirectUrl: https://example.com/modeler
-      enabled: true
-    # This defines how Identity authenticates to Keycloak admin API
-    # Identity will connect to Keycloak the first time it boots and create the camunda-platform realm
+      console:
+        redirectUrl: https://example.com/console
     keycloak:
       url:
         protocol: http
@@ -55,9 +50,10 @@ global:
         adminUser: admin
         existingSecret: "camunda-credentials"
         existingSecretKey: "identity-keycloak-admin-password"
-      contextPath: /auth
-prometheusServiceMonitor:
-  enabled: true
+  elasticsearch:
+    enabled: true
+  multitenancy:
+    enabled: true
 connectors:
   security:
     authentication:
@@ -66,9 +62,10 @@ connectors:
         secret:
           existingSecret: camunda-credentials
           existingSecretKey: identity-connectors-client-token
-# Identity configured to point to an external postgresql database
 identity:
   enabled: true
+  contextPath: /management
+  fullURL: https://example.com/management
   firstUser:
     secret:
       existingSecret: "camunda-credentials"
@@ -76,46 +73,62 @@ identity:
   env:
     - name: KEYCLOAK_REALM
       value: camunda-platform
-  externalDatabase:
+  multitenancy:
     enabled: true
-    host: 127.0.0.1
-    port: 5432
-    database: identity
-    schema: public
-    username: identity
-    secret:
-      existingSecret: camunda-credentials
-      existingSecretKey: identity-postgresql-user-password
-# Keycloak will be installed but configure it to point to an external postgresql database
+identityPostgresql:
+  enabled: true
+  auth:
+    existingSecret: camunda-credentials
+# Keycloak will be installed and will use internally provisioned PostgreSQL database
 identityKeycloak:
   enabled: true
-  # This defines the admin user and password for Keycloak. Keycloak will create this user during first start
-  auth:
-    adminUser: admin
-    existingSecret: camunda-credentials
-    passwordSecretKey: identity-keycloak-admin-password
-  # Tell the Keycloak chart to disable its internal database so that we can configure an external one
   postgresql:
-    enabled: false
-  # Tell the Keycloak chart to use an external database
-  externalDatabase:
-    host: 127.0.0.1
-    port: 5432
-    database: keycloak
-    schema: public
-    # The username that keycloak uses to connect to the external db
-    user: keycloak_user
-    # The password that keycloak uses to connect to the external database
-    existingSecret: camunda-credentials
-    existingSecretPasswordKey: identity-keycloak-user-password
+    auth:
+      existingSecret: camunda-credentials
+      # Override default key names so Keycloak's internal PostgreSQL
+      # shares the same secret keys as identityPostgresql:
+      secretKeys:
+        adminPasswordKey: identity-postgresql-admin-password
+        userPasswordKey: identity-postgresql-user-password
 webModeler:
   contextPath: /modeler
   enabled: true
+  # WebSocket public reachability for the browser client.
+  # The chart only auto-fills these from global.ingress when global.ingress.enabled=true.
+  # Recipes that use Traefik IngressRoute CRDs (no chart-managed Ingress) need them set here.
+  # For chart-managed Ingress recipes these are ignored — global.ingress.host wins.
+  websockets:
+    publicHost: example.com
+    publicPort: 443
+    env:
+      # Tell the websocket server it is mounted at /modeler-ws so it accepts
+      # requests on that prefix instead of "/".
+      - name: PUSHER_APP_PATH
+        value: "/modeler-ws"
   restapi:
+    # Stable Pusher app key + secret sourced from the camunda-credentials secret
+    # so values do not rotate on `helm upgrade` (the chart otherwise regenerates
+    # them via randAlphaNum on every render). Both restapi and websockets
+    # consume the same refs, so they always agree.
+    pusher:
+      secret:
+        existingSecret: camunda-credentials
+        existingSecretKey: webmodeler-pusher-app-secret
+      client:
+        secret:
+          existingSecret: camunda-credentials
+          existingSecretKey: webmodeler-pusher-app-key
     mail:
       # This value is required, otherwise the restapi pod wouldn't start.
       fromAddress: noreply@example.com
     env:
+      # Override pusher.client.force-tls and pusher.client.path in the restapi's
+      # application.yaml. Required when global.ingress.enabled is false — the
+      # chart hard-codes force-tls=false and omits the path in that case.
+      - name: CAMUNDA_MODELER_PUSHER_CLIENT_FORCETLS
+        value: "true"
+      - name: CAMUNDA_MODELER_PUSHER_CLIENT_PATH
+        value: "/modeler-ws"
       - name: CAMUNDA_MODELER_CLUSTERS_0_ID
         value: "camunda-demo-cluster"
       - name: CAMUNDA_MODELER_CLUSTERS_0_NAME
@@ -138,46 +151,47 @@ webModeler:
         value: "DEBUG"
       - name: SPRING_PROFILES_INCLUDE
         value: "default-logging"
-    externalDatabase:
-      enabled: true
-      host: "127.0.0.1"
-      port: 5432
-      database: "modeler"
-      user: "modeler_user"
-      secret:
-        existingSecret: "camunda-credentials"
-        existingSecretKey: "webmodeler-postgresql-user-password"
-orchestration:
+      - name: CAMUNDA_MODELER_GITSYNC_GITHUB_BASEURL
+        value: https://api.github.com
+      - name: CAMUNDA_MODELER_GITSYNC_MAXFILES
+        value: "50"
+webModelerPostgresql:
   enabled: true
-  contextPath: "/orchestration"
+  auth:
+    existingSecret: "camunda-credentials"
+    secretKeys:
+      adminPasswordKey: webmodeler-postgresql-admin-password
+      userPasswordKey: webmodeler-postgresql-user-password
+orchestration:
   data:
     secondaryStorage:
-      opensearch:
-        auth:
-          secret:
-            existingSecret: "camunda-credentials"
-            existingSecretKey: "opensearch-password"
-  env:
-    - name: SPRING_PROFILES_ACTIVE
-      value: "broker,identity,operate,tasklist,consolidated-auth"
-    - name: SERVER_FORWARD_HEADERS_STRATEGY
-      value: "framework"
-# Optimize connected to OpenSearch
-# Host/port/protocol/username fall back to global.opensearch settings
-# from enable-opensearch.yaml, so only component-specific overrides here.
-optimize:
-  enabled: true
-  contextPath: "/optimize"
-  database:
-    opensearch:
-      auth:
-        secret:
-          existingSecret: "camunda-credentials"
-          existingSecretKey: "opensearch-password"
+      type: elasticsearch
+  contextPath: /orchestration
   security:
     authentication:
       oidc:
-        redirectRootUrl: "https://example.com"
+        secret:
+          existingSecret: "camunda-credentials"
+          existingSecretKey: "identity-orchestration-client-token"
+        redirectUrl: https://example.com/orchestration
+  multitenancy:
+    checks:
+      enabled: true
+    api:
+      enabled: true
+# Optimize connected to Elasticsearch.
+# Host/port/protocol fall back to global.elasticsearch settings
+# from enable-elasticsearch.yaml, so only component-specific overrides here.
+# OIDC redirect for Optimize is configured via global.identity.auth.optimize.redirectUrl
+# in oidc.yaml — the chart maps that to ccsm.redirectRootUrl in Optimize's app config.
+optimize:
+  enabled: true
+  contextPath: "/optimize"
+  migration:
+    enabled: false
+  env:
+    - name: ES_LOG_LEVEL
+      value: "trace"
 console:
   enabled: true
   contextPath: "/console"
