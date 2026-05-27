@@ -12,6 +12,8 @@ CAMUNDA_CHART ?= camunda/camunda-platform
 CAMUNDA_HELM_CHART_VERSION ?= 14.0.0
 CAMUNDA_VERSION ?= 8.9.0
 
+# To enable BPM Copilot to use Google Vertex AI, replace `modeler-enabled.yaml` below
+#  and use `modeler-enabled-copilot-vertexai.yaml` instead. 
 CAMUNDA_HELM_VALUES ?= \
   $(root)/camunda-values.yaml.d/enable-elasticsearch.yaml \
   $(root)/camunda-values.yaml.d/enable-metrics.yaml \

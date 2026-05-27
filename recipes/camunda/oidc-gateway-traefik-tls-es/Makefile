@@ -23,3 +23,6 @@ include $(root)/makefiles/gateway-traefik.mk
 include $(root)/makefiles/keycloak.mk
 include $(root)/makefiles/letsencrypt.mk
 include $(root)/makefiles/test.mk
+# Uncomment to configure BPMN Copilot to use Google Vertex AI
+# And also use `modeler-enabled-copilot-vertexai.yaml` in config.mk
+# include $(root)/makefiles/vertexai.mk

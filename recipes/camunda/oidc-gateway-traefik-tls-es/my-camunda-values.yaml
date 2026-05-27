@@ -1,3 +1,10 @@
 # Helm chart values are imported from `../../camunda-values.yaml.d` via `config.mk`.
 # This file only contains additional overrides.
 # Note that array values, e.g. `orchestration.env` can NOT be merged by Helm.
+
+optimize:
+  migration:
+    enabled: false
+  env:
+    - name: ES_LOG_LEVEL
+      value: "trace"
