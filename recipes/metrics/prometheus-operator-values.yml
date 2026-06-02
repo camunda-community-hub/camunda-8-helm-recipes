@@ -69,7 +69,9 @@ prometheus:
           resources:
             requests:
               storage: 50Gi
-          storageClassName: ssd
+          # "ssd" does not exist on all clusters (e.g. GKE only has standard-rwo/premium-rwo).
+          # Leave unset to use the cluster's default StorageClass, or set premium-rwo on GKE for SSD-backed disks.
+          # storageClassName: ssd
 #    nodeSelector:
 #      cloud.google.com/gke-nodepool: default-pool
 #      alpha.eksctl.io/nodegroup-name: c7g-8xlarge
