@@ -23,14 +23,6 @@ make logs-benchmark
 make clean
 ```
 
-### Optional: wait for Zeebe before starting
-
-If you just installed Camunda and want to wait until the gateway is healthy:
-
-```bash
-make await-zeebe benchmark
-```
-
 ## Configuration
 
 ### Namespace / release name
@@ -85,4 +77,3 @@ Increase `startPiPerSecond` (or let `backpressure` mode ramp up automatically) u
 | `make benchmark` | Create payload ConfigMap and deploy benchmark pod |
 | `make clean` / `make clean-benchmark` | Remove benchmark deployment and ConfigMap |
 | `make logs-benchmark` | Stream live logs from the benchmark pod |
-| `make await-zeebe` | Wait for Zeebe gateway deployment to become available |
