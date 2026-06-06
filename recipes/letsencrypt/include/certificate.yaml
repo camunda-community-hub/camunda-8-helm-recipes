@@ -10,3 +10,4 @@ spec:
     kind: ClusterIssuer
   dnsNames:
     - <YOUR_HOSTNAME>
+    - grpc.<YOUR_HOSTNAME>
