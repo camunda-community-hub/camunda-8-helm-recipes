@@ -47,7 +47,7 @@ spec:
               -Dbenchmark.jobType=benchmark-task
               -Dbenchmark.multipleJobTypes=${BENCHMARK_MULTIPLE_JOB_TYPES}
               -Dbenchmark.payloadPath=file:/payload.json
-              -Dbenchmark.autoDeployProcess=true
+              -Dbenchmark.autoDeployProcess=false
               -Dbenchmark.warmupPhaseDurationMillis=${BENCHMARK_WARMUP_DURATION_MS}
               -Dbenchmark.startRateAdjustmentStrategy=backpressure
               -Dbenchmark.startPiIncreaseFactor=0.1

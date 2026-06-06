@@ -14,6 +14,7 @@ BENCHMARK_WARMUP_DURATION_MS ?= 3000
 
 # OIDC authentication (required for benchmark-oidc target)
 # Override these in the root config.mk - do not commit secrets
+BENCHMARK_TENANT_ID ?= <default>
 BENCHMARK_CLIENT_ID ?= benchmark
 BENCHMARK_TOKEN_URL ?= http://camunda-keycloak/auth/realms/camunda-platform/protocol/openid-connect/token
 BENCHMARK_TOKEN_AUDIENCE ?= zeebe-api
