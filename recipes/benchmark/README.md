@@ -10,31 +10,48 @@ Runs the [camunda-8-benchmark](https://github.com/camunda-community-hub/camunda-
 
 ## Usage
 
+### No authentication
+
 ```bash
 cd recipes/benchmark
-
-# Start the benchmark (creates ConfigMap + deploys benchmark pod)
 make
-
-# Stream benchmark logs
 make logs-benchmark
-
-# Stop the benchmark
 make clean
 ```
+
+### OIDC authentication
+
+1. Create a machine-to-machine client in Keycloak/Identity with access to the `zeebe-api` audience.
+
+2. Set the auth variables in your root `config.mk` (not committed):
+
+   ```makefile
+   BENCHMARK_CLIENT_ID = benchmark
+   BENCHMARK_TOKEN_URL = http://camunda-keycloak/auth/realms/camunda-platform/protocol/openid-connect/token
+   BENCHMARK_TOKEN_AUDIENCE = zeebe-api
+   BENCHMARK_CLIENT_SECRET = <your-client-secret>
+   ```
+
+4. Run:
+
+   ```bash
+   make benchmark-oidc
+   make logs-benchmark
+   make clean
+   ```
 
 ## Configuration
 
 ### Namespace / release name
 
-Create a `config.mk` in the **project root** (not committed) to override defaults:
+Override in the **project root** `config.mk`:
 
 ```makefile
 BENCHMARK_NAMESPACE = camunda        # namespace where Camunda is running
 CAMUNDA_RELEASE_NAME = camunda       # Helm release name (used to find the gateway service)
 ```
 
-If your release name is not `camunda`, also update the `grpc-address` in `benchmark.yaml`:
+If your release name is not `camunda`, also update the `grpc-address` in the relevant include file:
 
 ```yaml
 -Dcamunda.client.zeebe.grpc-address=http://<your-release-name>-zeebe-gateway:26500
@@ -42,7 +59,7 @@ If your release name is not `camunda`, also update the `grpc-address` in `benchm
 
 ### Benchmark parameters
 
-Edit `benchmark.yaml` to tune the load profile. Key settings:
+Edit `include/benchmark.yaml` or `include/benchmark-oidc.yaml` to tune the load profile. Key settings:
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -58,7 +75,7 @@ Edit `benchmark.yaml` to tune the load profile. Key settings:
 
 ### Payload
 
-Edit `payload.json` to change the variables sent with each process instance. The default payload is a representative mix of strings, booleans, numbers, and UUIDs.
+Edit `include/payload.json` to change the variables sent with each process instance. The default payload is a representative mix of strings, booleans, numbers, and UUIDs.
 
 ## Analysing results
 
@@ -73,7 +90,9 @@ Increase `startPiPerSecond` (or let `backpressure` mode ramp up automatically) u
 
 | Target | Description |
 |--------|-------------|
-| `make` / `make all` | Deploy benchmark (same as `make benchmark`) |
-| `make benchmark` | Create payload ConfigMap and deploy benchmark pod |
-| `make clean` / `make clean-benchmark` | Remove benchmark deployment and ConfigMap |
+| `make` / `make all` | Deploy benchmark without auth (same as `make benchmark`) |
+| `make benchmark` | Create payload ConfigMap and deploy benchmark pod (no auth) |
+| `make benchmark-oidc` | Create credentials secret, payload ConfigMap, and deploy benchmark pod (OIDC) |
+| `make create-benchmark-credentials` | Create the `benchmark-credentials` K8s secret from `BENCHMARK_CLIENT_SECRET` |
+| `make clean` / `make clean-benchmark` | Remove benchmark deployment, credentials secret, and payload ConfigMap |
 | `make logs-benchmark` | Stream live logs from the benchmark pod |

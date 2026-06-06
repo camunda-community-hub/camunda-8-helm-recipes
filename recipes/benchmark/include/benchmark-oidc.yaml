@@ -1,0 +1,80 @@
+# Benchmark tool for Camunda 8 with OIDC authentication.
+# https://github.com/camunda-community-hub/camunda-8-benchmark
+#
+# Before running 'make benchmark-oidc':
+#   1. Edit BENCHMARK_CLIENT_ID, BENCHMARK_TOKEN_URL, and BENCHMARK_TOKEN_AUDIENCE below.
+#   2. Run 'make create-benchmark-credentials' to create the client-secret K8s secret.
+#
+# If your Camunda Helm release name is not "camunda", update the grpc-address below.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: benchmark
+  labels:
+    app: benchmark
+spec:
+  selector:
+    matchLabels:
+      app: benchmark
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: benchmark
+    spec:
+      containers:
+      - name: benchmark
+        image: camundacommunityhub/camunda-8-benchmark:main
+        imagePullPolicy: Always
+        env:
+          - name: BENCHMARK_CLIENT_ID
+            value: "${BENCHMARK_CLIENT_ID}"
+          - name: BENCHMARK_TOKEN_URL
+            value: "${BENCHMARK_TOKEN_URL}"
+          - name: BENCHMARK_TOKEN_AUDIENCE
+            value: "${BENCHMARK_TOKEN_AUDIENCE}"
+          - name: BENCHMARK_CLIENT_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: benchmark-credentials
+                key: client-secret
+          - name: JAVA_OPTIONS
+            value: >-
+              -Dcamunda.client.mode=selfmanaged
+              -Dcamunda.client.zeebe.grpc-address=http://camunda-zeebe-gateway:26500
+              -Dcamunda.client.zeebe.prefer-rest-over-grpc=false
+              -Dcamunda.client.zeebe.request-timeout=600s
+              -Dcamunda.client.zeebe.defaults.poll-interval=1ms
+              -Dzeebe.client.default-job-worker-stream-enabled=true
+              -Dzeebe.client.worker.max-jobs-active=2000
+              -Dcamunda.client.auth.client-id=$(BENCHMARK_CLIENT_ID)
+              -Dcamunda.client.auth.client-secret=$(BENCHMARK_CLIENT_SECRET)
+              -Dcamunda.client.auth.token-url=$(BENCHMARK_TOKEN_URL)
+              -Dcamunda.client.zeebe.audience=$(BENCHMARK_TOKEN_AUDIENCE)
+              -Dbenchmark.startPiPerSecond=5
+              -Dbenchmark.maxBackpressurePercentage=1.0
+              -Dbenchmark.taskCompletionDelay=10
+              -Dbenchmark.bpmnProcessId=BenchmarkProcess
+              -Dbenchmark.jobType=benchmark-task
+              -Dbenchmark.multipleJobTypes=8
+              -Dbenchmark.payloadPath=file:/payload.json
+              -Dbenchmark.autoDeployProcess=true
+              -Dbenchmark.warmupPhaseDurationMillis=3000
+              -Dbenchmark.startRateAdjustmentStrategy=backpressure
+              -Dbenchmark.startPiIncreaseFactor=0.1
+        resources:
+          limits:
+            cpu: "1"
+            memory: 4Gi
+          requests:
+            cpu: "1"
+            memory: 1Gi
+        volumeMounts:
+        - name: payload
+          mountPath: /payload.json
+          subPath: payload.json
+          readOnly: true
+      volumes:
+      - name: payload
+        configMap:
+          name: benchmark-payload
