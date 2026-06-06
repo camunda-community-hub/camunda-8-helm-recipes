@@ -59,3 +59,61 @@ clean-benchmark:
 logs-benchmark:
 	kubectl logs -f -l app=benchmark -n $(BENCHMARK_NAMESPACE)
 
+# Cluster scaling via the Zeebe gateway management API (port 9600)
+# Docs: https://docs.camunda.io/docs/self-managed/components/orchestration-cluster/zeebe/operations/cluster-scaling/
+SCALE_BROKER_COUNT ?= 3
+SCALE_PARTITION_COUNT ?= 9
+SCALE_REPLICATION_FACTOR ?= 3
+ZEEBE_MANAGEMENT_PORT ?= 9600
+
+# Port-forwards the gateway management port, captures PID, and traps cleanup on shell exit.
+# Expanded inline in each target so port-forward and curl share the same shell process.
+_zeebe_mgmt_pf = kubectl port-forward svc/$(CAMUNDA_RELEASE_NAME)-zeebe-gateway $(ZEEBE_MANAGEMENT_PORT):$(ZEEBE_MANAGEMENT_PORT) -n $(BENCHMARK_NAMESPACE) >/dev/null 2>&1 & PF_PID=$$!; trap "kill $$PF_PID 2>/dev/null" EXIT; sleep 2
+
+# NOTE: safe for scale-up only. Use scale-down for reducing broker count — it drains
+# partitions via the cluster API before scaling the StatefulSet down.
+.PHONY: scale-up # scale StatefulSet to SCALE_BROKER_COUNT replicas then rebalance partitions via the cluster API
+scale-up:
+	kubectl scale statefulset $(CAMUNDA_RELEASE_NAME)-zeebe \
+	  --replicas=$(SCALE_BROKER_COUNT) -n $(BENCHMARK_NAMESPACE)
+	kubectl rollout status statefulset/$(CAMUNDA_RELEASE_NAME)-zeebe \
+	  -n $(BENCHMARK_NAMESPACE)
+	$(_zeebe_mgmt_pf); \
+	curl -sf -X PATCH 'http://localhost:$(ZEEBE_MANAGEMENT_PORT)/orchestration/actuator/cluster' \
+	  -H 'Content-Type: application/json' \
+	  -d '{"brokers":{"count":$(SCALE_BROKER_COUNT)},"partitions":{"count":$(SCALE_PARTITION_COUNT),"replicationFactor":$(SCALE_REPLICATION_FACTOR)}}'
+
+# NOTE: safe for scale-down only. Calls the cluster API first to drain partitions off the
+# brokers being removed, waits for rebalancing to complete, then scales the StatefulSet down.
+.PHONY: scale-down # drain partitions via cluster API, wait for completion, then scale StatefulSet down
+scale-down:
+	$(_zeebe_mgmt_pf); \
+	echo "Requesting partition drain for $(SCALE_BROKER_COUNT) brokers..."; \
+	curl -sf -X PATCH 'http://localhost:$(ZEEBE_MANAGEMENT_PORT)/orchestration/actuator/cluster' \
+	  -H 'Content-Type: application/json' \
+	  -d '{"brokers":{"count":$(SCALE_BROKER_COUNT)},"partitions":{"count":$(SCALE_PARTITION_COUNT),"replicationFactor":$(SCALE_REPLICATION_FACTOR)}}'; \
+	echo "Waiting for rebalancing to complete..."; \
+	until curl -sf 'http://localhost:$(ZEEBE_MANAGEMENT_PORT)/orchestration/actuator/cluster' \
+	  | jq -e '.pendingChange == null' >/dev/null 2>&1; do \
+	  sleep 5; \
+	  echo "Still rebalancing..."; \
+	done; \
+	echo "Rebalancing complete."
+	kubectl scale statefulset $(CAMUNDA_RELEASE_NAME)-zeebe \
+	  --replicas=$(SCALE_BROKER_COUNT) -n $(BENCHMARK_NAMESPACE)
+	kubectl rollout status statefulset/$(CAMUNDA_RELEASE_NAME)-zeebe \
+	  -n $(BENCHMARK_NAMESPACE)
+
+.PHONY: scale-up-dry-run # preview scale-up changes without applying them
+scale-up-dry-run:
+	$(_zeebe_mgmt_pf); \
+	curl -sf -X PATCH 'http://localhost:$(ZEEBE_MANAGEMENT_PORT)/orchestration/actuator/cluster?dryRun=true' \
+	  -H 'Content-Type: application/json' \
+	  -d '{"brokers":{"count":$(SCALE_BROKER_COUNT)},"partitions":{"count":$(SCALE_PARTITION_COUNT),"replicationFactor":$(SCALE_REPLICATION_FACTOR)}}'
+
+.PHONY: cluster-status # show current cluster topology and any in-progress scaling operation
+cluster-status:
+	$(_zeebe_mgmt_pf); \
+	curl -sf 'http://localhost:$(ZEEBE_MANAGEMENT_PORT)/orchestration/actuator/cluster' | \
+	jq '{version, brokers: [.brokers[] | {id, state, partitions: [.partitions[] | {id, state, priority}]}], routing, lastChange, pendingChange}'
+

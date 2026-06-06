@@ -12,6 +12,11 @@ BENCHMARK_BPMN_PROCESS_ID ?= BenchmarkProcess
 BENCHMARK_MULTIPLE_JOB_TYPES ?= 8
 BENCHMARK_WARMUP_DURATION_MS ?= 3000
 
+# Cluster scaling (used by scale-cluster targets)
+SCALE_BROKER_COUNT ?= 3
+SCALE_PARTITION_COUNT ?= 9
+SCALE_REPLICATION_FACTOR ?= 3
+
 # OIDC authentication (required for benchmark-oidc target)
 # Override these in the root config.mk - do not commit secrets
 BENCHMARK_TENANT_ID ?= <default>
