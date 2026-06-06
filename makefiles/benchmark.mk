@@ -1,19 +1,36 @@
 BENCHMARK_NAMESPACE ?= $(CAMUNDA_NAMESPACE)
+BENCHMARK_REPLICAS ?= 1
+BENCHMARK_START_PI_PER_SECOND ?= 5
+BENCHMARK_BPMN_PROCESS_ID ?= BenchmarkProcess
+BENCHMARK_MULTIPLE_JOB_TYPES ?= 8
+BENCHMARK_WARMUP_DURATION_MS ?= 3000
 BENCHMARK_CLIENT_ID ?= benchmark
 BENCHMARK_TOKEN_URL ?= http://camunda-keycloak/auth/realms/camunda-platform/protocol/openid-connect/token
 BENCHMARK_TOKEN_AUDIENCE ?= zeebe-api
 BENCHMARK_CLIENT_SECRET ?= changeme
 
+# Common env exports and envsubst variable list shared by both deploy targets
+_BENCHMARK_ENV = \
+  BENCHMARK_REPLICAS=$(BENCHMARK_REPLICAS) \
+  BENCHMARK_START_PI_PER_SECOND=$(BENCHMARK_START_PI_PER_SECOND) \
+  BENCHMARK_BPMN_PROCESS_ID=$(BENCHMARK_BPMN_PROCESS_ID) \
+  BENCHMARK_MULTIPLE_JOB_TYPES=$(BENCHMARK_MULTIPLE_JOB_TYPES) \
+  BENCHMARK_WARMUP_DURATION_MS=$(BENCHMARK_WARMUP_DURATION_MS)
+_BENCHMARK_VARS = $$BENCHMARK_REPLICAS $$BENCHMARK_START_PI_PER_SECOND $$BENCHMARK_BPMN_PROCESS_ID $$BENCHMARK_MULTIPLE_JOB_TYPES $$BENCHMARK_WARMUP_DURATION_MS
+
 .PHONY: benchmark # create the payload ConfigMap and deploy the benchmark tool (no auth)
 benchmark: _benchmark-payload
-	kubectl apply -f ./include/benchmark.yaml -n $(BENCHMARK_NAMESPACE)
+	$(_BENCHMARK_ENV) \
+	  envsubst '$(_BENCHMARK_VARS)' \
+	  < ./include/benchmark.yaml | kubectl apply -f - -n $(BENCHMARK_NAMESPACE)
 
 .PHONY: benchmark-oidc # create the payload ConfigMap and deploy the benchmark tool (OIDC auth)
 benchmark-oidc: create-benchmark-credentials _benchmark-payload
+	$(_BENCHMARK_ENV) \
 	BENCHMARK_CLIENT_ID=$(BENCHMARK_CLIENT_ID) \
 	BENCHMARK_TOKEN_URL=$(BENCHMARK_TOKEN_URL) \
 	BENCHMARK_TOKEN_AUDIENCE=$(BENCHMARK_TOKEN_AUDIENCE) \
-	  envsubst '$$BENCHMARK_CLIENT_ID $$BENCHMARK_TOKEN_URL $$BENCHMARK_TOKEN_AUDIENCE' \
+	  envsubst '$(_BENCHMARK_VARS) $$BENCHMARK_CLIENT_ID $$BENCHMARK_TOKEN_URL $$BENCHMARK_TOKEN_AUDIENCE' \
 	  < ./include/benchmark-oidc.yaml | kubectl apply -f - -n $(BENCHMARK_NAMESPACE)
 
 .PHONY: _benchmark-payload

@@ -16,7 +16,7 @@ spec:
   selector:
     matchLabels:
       app: benchmark
-  replicas: 1
+  replicas: ${BENCHMARK_REPLICAS}
   template:
     metadata:
       labels:
@@ -51,15 +51,15 @@ spec:
               -Dcamunda.client.auth.client-secret=$(BENCHMARK_CLIENT_SECRET)
               -Dcamunda.client.auth.token-url=$(BENCHMARK_TOKEN_URL)
               -Dcamunda.client.zeebe.audience=$(BENCHMARK_TOKEN_AUDIENCE)
-              -Dbenchmark.startPiPerSecond=5
+              -Dbenchmark.startPiPerSecond=${BENCHMARK_START_PI_PER_SECOND}
               -Dbenchmark.maxBackpressurePercentage=1.0
               -Dbenchmark.taskCompletionDelay=10
-              -Dbenchmark.bpmnProcessId=BenchmarkProcess
+              -Dbenchmark.bpmnProcessId=${BENCHMARK_BPMN_PROCESS_ID}
               -Dbenchmark.jobType=benchmark-task
-              -Dbenchmark.multipleJobTypes=8
+              -Dbenchmark.multipleJobTypes=${BENCHMARK_MULTIPLE_JOB_TYPES}
               -Dbenchmark.payloadPath=file:/payload.json
               -Dbenchmark.autoDeployProcess=true
-              -Dbenchmark.warmupPhaseDurationMillis=3000
+              -Dbenchmark.warmupPhaseDurationMillis=${BENCHMARK_WARMUP_DURATION_MS}
               -Dbenchmark.startRateAdjustmentStrategy=backpressure
               -Dbenchmark.startPiIncreaseFactor=0.1
         resources:
