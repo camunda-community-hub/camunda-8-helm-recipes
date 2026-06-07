@@ -76,29 +76,32 @@ _zeebe_mgmt_pf = kubectl port-forward svc/$(CAMUNDA_RELEASE_NAME)-zeebe-gateway 
 scale-up:
 	kubectl scale statefulset $(CAMUNDA_RELEASE_NAME)-zeebe \
 	  --replicas=$(SCALE_BROKER_COUNT) -n $(BENCHMARK_NAMESPACE)
-	kubectl rollout status statefulset/$(CAMUNDA_RELEASE_NAME)-zeebe \
-	  -n $(BENCHMARK_NAMESPACE)
 	$(_zeebe_mgmt_pf); \
 	curl -sf -X PATCH 'http://localhost:$(ZEEBE_MANAGEMENT_PORT)/orchestration/actuator/cluster' \
 	  -H 'Content-Type: application/json' \
 	  -d '{"brokers":{"count":$(SCALE_BROKER_COUNT)},"partitions":{"count":$(SCALE_PARTITION_COUNT),"replicationFactor":$(SCALE_REPLICATION_FACTOR)}}'
 
-# NOTE: safe for scale-down only. Calls the cluster API first to drain partitions off the
-# brokers being removed, waits for rebalancing to complete, then scales the StatefulSet down.
-.PHONY: scale-down # drain partitions via cluster API, wait for completion, then scale StatefulSet down
+# NOTE: partition scale-down is not supported by Zeebe. Only broker count can be reduced.
+# Brokers are drained via the cluster API before the StatefulSet is scaled down.
+.PHONY: scale-down # drain brokers via cluster API then scale StatefulSet down (partition count is unchanged)
 scale-down:
 	$(_zeebe_mgmt_pf); \
-	echo "Requesting partition drain for $(SCALE_BROKER_COUNT) brokers..."; \
-	curl -sf -X PATCH 'http://localhost:$(ZEEBE_MANAGEMENT_PORT)/orchestration/actuator/cluster' \
+	echo "Scaling brokers down to $(SCALE_BROKER_COUNT)..."; \
+	curl -s -X PATCH 'http://localhost:$(ZEEBE_MANAGEMENT_PORT)/orchestration/actuator/cluster' \
 	  -H 'Content-Type: application/json' \
-	  -d '{"brokers":{"count":$(SCALE_BROKER_COUNT)},"partitions":{"count":$(SCALE_PARTITION_COUNT),"replicationFactor":$(SCALE_REPLICATION_FACTOR)}}'; \
-	echo "Waiting for rebalancing to complete..."; \
+	  -d '{"brokers":{"count":$(SCALE_BROKER_COUNT)}}' | jq .; \
+	for i in 1 2 3 4 5 6; do \
+	  sleep 5; \
+	  curl -sf 'http://localhost:$(ZEEBE_MANAGEMENT_PORT)/orchestration/actuator/cluster' \
+	    | jq -e '.pendingChange != null' >/dev/null 2>&1 && break; \
+	  echo "Waiting for broker change to register (attempt $$i/6)..."; \
+	done; \
 	until curl -sf 'http://localhost:$(ZEEBE_MANAGEMENT_PORT)/orchestration/actuator/cluster' \
 	  | jq -e '.pendingChange == null' >/dev/null 2>&1; do \
-	  sleep 5; \
-	  echo "Still rebalancing..."; \
+	  sleep 10; \
+	  echo "Still rebalancing brokers..."; \
 	done; \
-	echo "Rebalancing complete."
+	echo "Broker scale-down complete."
 	kubectl scale statefulset $(CAMUNDA_RELEASE_NAME)-zeebe \
 	  --replicas=$(SCALE_BROKER_COUNT) -n $(BENCHMARK_NAMESPACE)
 	kubectl rollout status statefulset/$(CAMUNDA_RELEASE_NAME)-zeebe \
