@@ -3,17 +3,24 @@ clean-files:
 	rm -f .disks
 	rm -f camunda-values.yaml
 
+ifeq ($(GCP_USE_SPOT),true)
+  SPOT_FLAG := --spot
+else
+  SPOT_FLAG :=
+endif
+
 .PHONY: kube-gke
 kube-gke:
+	@echo "Creating GKE cluster '$(DEPLOYMENT_NAME)' (spot=$(GCP_USE_SPOT), machine=$(GCP_MACHINE_TYPE), min=$(MIN_SIZE), max=$(MAX_SIZE))"
 	gcloud config set project $(GCP_PROJECT)
 	gcloud container clusters create $(DEPLOYMENT_NAME) \
 	  --region $(GCP_REGION) \
 	  --num-nodes=1 \
-	  --enable-autoscaling --max-nodes=$(MAX_SIZE) --min-nodes=$(MIN_SIZE) \
+	  --enable-autoscaling --min-nodes=$(MIN_SIZE) --max-nodes=$(MAX_SIZE) \
 	  --enable-ip-alias \
 	  --machine-type=$(GCP_MACHINE_TYPE) \
 	  --disk-type "pd-ssd" \
-	  --spot \
+	  $(SPOT_FLAG) \
 	  --maintenance-window=4:00 \
 	  --release-channel=regular \
 	  --cluster-version=latest
@@ -52,6 +59,51 @@ node-pool:
 
 # original command suggested by Web Console:
 # gcloud beta container --project "camunda-researchanddevelopment" node-pools create "pool-c3-standard-8" --cluster "falko-benchmark-16" --zone "europe-west1-b" --node-version "1.27.3-gke.1700" --machine-type "c3-standard-8" --image-type "COS_CONTAINERD" --disk-type "pd-ssd" --disk-size "100" --metadata disable-legacy-endpoints=true --scopes "https://www.googleapis.com/auth/devstorage.read_only","https://www.googleapis.com/auth/logging.write","https://www.googleapis.com/auth/monitoring","https://www.googleapis.com/auth/servicecontrol","https://www.googleapis.com/auth/service.management.readonly","https://www.googleapis.com/auth/trace.append" --spot --enable-autoscaling --total-min-nodes "0" --total-max-nodes "64" --location-policy "ANY" --enable-autoupgrade --enable-autorepair --max-surge-upgrade 0 --max-unavailable-upgrade 1
+
+STANDARD_POOL_NAME ?= pool-standard
+STANDARD_POOL_MIN_NODES ?= 1
+STANDARD_POOL_MAX_NODES ?= 6
+
+# Step 1: create a standard (non-spot) node pool with autoscaling
+.PHONY: node-pool-standard
+node-pool-standard:
+	gcloud container node-pools create "$(STANDARD_POOL_NAME)" \
+	  --project $(GCP_PROJECT) \
+	  --cluster $(DEPLOYMENT_NAME) \
+	  --region $(GCP_REGION) \
+	  --machine-type $(GCP_MACHINE_TYPE) \
+	  --disk-type "pd-ssd" \
+	  --num-nodes=1 \
+	  --enable-autoscaling --min-nodes=$(STANDARD_POOL_MIN_NODES) --max-nodes=$(STANDARD_POOL_MAX_NODES) \
+	  --enable-autoupgrade \
+	  --enable-autorepair
+
+# Step 2: cordon all spot nodes so no new pods are scheduled onto them
+.PHONY: cordon-spot-nodes
+cordon-spot-nodes:
+	kubectl get nodes -l cloud.google.com/gke-spot=true -o name | xargs kubectl cordon
+
+# Step 3: drain spot nodes, migrating all pods to the standard pool
+.PHONY: drain-spot-nodes
+drain-spot-nodes:
+	kubectl get nodes -l cloud.google.com/gke-spot=true -o name | \
+	  xargs -I{} kubectl drain {} --ignore-daemonsets --delete-emptydir-data
+
+# Run steps 1-3 in sequence to fully migrate to the standard node pool
+.PHONY: migrate-to-standard-pool
+migrate-to-standard-pool: node-pool-standard cordon-spot-nodes drain-spot-nodes
+	@echo "Migration complete. All pods are now running on standard (non-spot) nodes."
+	@echo "Run 'kubectl get nodes' and 'kubectl get pods -o wide' to verify."
+
+# Tear down the standard pool and restore spot nodes (run after demo)
+.PHONY: restore-spot-pool
+restore-spot-pool:
+	kubectl get nodes -l cloud.google.com/gke-spot=true -o name | xargs kubectl uncordon
+	gcloud container node-pools delete "$(STANDARD_POOL_NAME)" \
+	  --project $(GCP_PROJECT) \
+	  --cluster $(DEPLOYMENT_NAME) \
+	  --region $(GCP_REGION) \
+	  --quiet
 
 .PHONY: clean-kube-gke
 clean-kube-gke: use-kube

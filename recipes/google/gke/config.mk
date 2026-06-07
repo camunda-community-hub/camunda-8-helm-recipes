@@ -13,3 +13,6 @@ CLUSTER_VERSION ?= 1.34
 MIN_SIZE ?= 1
 MAX_SIZE ?= 10
 
+# Set to false to create a standard (non-spot) node pool — recommended for demos and stable environments
+GCP_USE_SPOT ?= true
+
