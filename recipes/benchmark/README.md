@@ -59,7 +59,17 @@ If your release name is not `camunda`, also update the `grpc-address` in the rel
 
 ### Benchmark parameters
 
-Edit `include/benchmark.yaml` or `include/benchmark-oidc.yaml` to tune the load profile. Key settings:
+The easiest way to tune the load profile is via `config.mk` in the project root (not committed). All variables use `?=` so any value set there takes precedence over the defaults in `recipes/benchmark/config.mk`.
+
+```makefile
+BENCHMARK_REPLICAS             = 1               # number of benchmark pods
+BENCHMARK_START_PI_PER_SECOND  = 5               # initial process instance creation rate
+BENCHMARK_BPMN_PROCESS_ID      = BenchmarkProcess  # process to instantiate
+BENCHMARK_MULTIPLE_JOB_TYPES   = 8               # number of distinct job types
+BENCHMARK_WARMUP_DURATION_MS   = 3000            # warmup period before rate adjustment begins
+```
+
+You can also edit `include/benchmark.yaml` or `include/benchmark-oidc.yaml` directly to change settings not exposed as variables. Key YAML fields:
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -76,6 +86,50 @@ Edit `include/benchmark.yaml` or `include/benchmark-oidc.yaml` to tune the load 
 ### Payload
 
 Edit `include/payload.json` to change the variables sent with each process instance. The default payload is a representative mix of strings, booleans, numbers, and UUIDs.
+
+## Horizontal cluster scaling
+
+The benchmark recipe includes targets to scale the Zeebe broker StatefulSet up or down while keeping partitions balanced. The targets use the Zeebe cluster management API (port 9600) via a temporary `kubectl port-forward`.
+
+### Configuration
+
+Set these in the root `config.mk`:
+
+```makefile
+SCALE_BROKER_COUNT      = 3   # target number of Zeebe brokers
+SCALE_PARTITION_COUNT   = 9   # total partitions (scale-up only; partition reduction is not supported)
+SCALE_REPLICATION_FACTOR = 3  # replication factor per partition (scale-up only)
+```
+
+### Scale up
+
+Scales the StatefulSet to `SCALE_BROKER_COUNT` replicas and then calls the cluster API to rebalance partitions:
+
+```bash
+make scale-up
+```
+
+Preview the changes without applying them:
+
+```bash
+make scale-up-dry-run
+```
+
+### Scale down
+
+Drains brokers gracefully via the cluster API first (waits for rebalancing to complete), then scales the StatefulSet down. Only broker count can be reduced — partition count is not changed on scale-down.
+
+```bash
+make scale-down
+```
+
+### Check cluster status
+
+Show current topology and any in-progress scaling operation:
+
+```bash
+make cluster-status
+```
 
 ## Analysing results
 
@@ -96,3 +150,7 @@ Increase `startPiPerSecond` (or let `backpressure` mode ramp up automatically) u
 | `make create-benchmark-credentials` | Create the `benchmark-credentials` K8s secret from `BENCHMARK_CLIENT_SECRET` |
 | `make clean` / `make clean-benchmark` | Remove benchmark deployment, credentials secret, and payload ConfigMap |
 | `make logs-benchmark` | Stream live logs from the benchmark pod |
+| `make scale-up` | Scale StatefulSet to `SCALE_BROKER_COUNT` and rebalance partitions via cluster API |
+| `make scale-up-dry-run` | Preview scale-up changes without applying them |
+| `make scale-down` | Drain brokers via cluster API, then scale StatefulSet down |
+| `make cluster-status` | Show current cluster topology and any in-progress scaling operation |
