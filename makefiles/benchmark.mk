@@ -23,7 +23,7 @@ _BENCHMARK_VARS = $$BENCHMARK_REPLICAS $$BENCHMARK_START_PI_PER_SECOND $$BENCHMA
 benchmark: _benchmark-payload
 	$(_BENCHMARK_ENV) \
 	  envsubst '$(_BENCHMARK_VARS)' \
-	  < ./include/benchmark.yaml | kubectl apply -f - -n $(BENCHMARK_NAMESPACE)
+	  < $(root)/recipes/benchmark/include/benchmark.yaml | kubectl apply -f - -n $(BENCHMARK_NAMESPACE)
 
 .PHONY: benchmark-oidc # create the payload ConfigMap and deploy the benchmark tool (OIDC auth)
 benchmark-oidc: create-benchmark-credentials _benchmark-payload
@@ -33,13 +33,13 @@ benchmark-oidc: create-benchmark-credentials _benchmark-payload
 	BENCHMARK_TOKEN_URL=$(BENCHMARK_TOKEN_URL) \
 	BENCHMARK_TOKEN_AUDIENCE=$(BENCHMARK_TOKEN_AUDIENCE) \
 	  envsubst '$(_BENCHMARK_VARS) $$BENCHMARK_TENANT_ID $$BENCHMARK_CLIENT_ID $$BENCHMARK_TOKEN_URL $$BENCHMARK_TOKEN_AUDIENCE' \
-	  < ./include/benchmark-oidc.yaml | kubectl apply -f - -n $(BENCHMARK_NAMESPACE)
+	  < $(root)/recipes/benchmark/include/benchmark-oidc.yaml | kubectl apply -f - -n $(BENCHMARK_NAMESPACE)
 
 .PHONY: _benchmark-payload
 _benchmark-payload:
 	-kubectl delete configmap benchmark-payload -n $(BENCHMARK_NAMESPACE) 2>/dev/null || true
 	kubectl create configmap benchmark-payload \
-	  --from-file=payload.json=./include/payload.json \
+	  --from-file=payload.json=$(root)/recipes/benchmark/include/payload.json \
 	  -n $(BENCHMARK_NAMESPACE)
 
 .PHONY: create-benchmark-credentials # create the benchmark-credentials secret from BENCHMARK_CLIENT_SECRET

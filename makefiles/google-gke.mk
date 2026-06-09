@@ -106,7 +106,7 @@ restore-spot-pool:
 	  --quiet
 
 .PHONY: clean-kube-gke
-clean-kube-gke: use-kube
+clean-kube-gke:
 #	-kubectl delete pvc --all
 	@echo "Please check the console if all PVCs have been deleted: https://console.cloud.google.com/compute/disks?authuser=0&project=$(GCP_PROJECT)&supportedpurview=project"
 	gcloud container clusters delete $(DEPLOYMENT_NAME) --region $(GCP_REGION) --async --quiet

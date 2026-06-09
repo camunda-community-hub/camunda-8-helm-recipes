@@ -5,7 +5,7 @@ DEPLOYMENT_NAME ?= mydeployment
 
 # Cloud environment and K8s cluster
 GCP_PROJECT ?= xyz
-GCP_REGION ?= us-east4-a
+GCP_REGION ?= us-east4
 
 GCP_MACHINE_TYPE ?= n1-standard-16
 CLUSTER_VERSION ?= 1.34
