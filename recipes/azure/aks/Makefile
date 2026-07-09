@@ -28,3 +28,4 @@ include $(root)/makefiles/azure-aks.mk
 include $(root)/makefiles/letsencrypt.mk
 include $(root)/makefiles/ingress-nginx.mk
 include $(root)/makefiles/metrics.mk
+include $(root)/makefiles/dns.mk

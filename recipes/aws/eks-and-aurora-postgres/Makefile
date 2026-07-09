@@ -25,6 +25,7 @@ setup-ingress-nginx: ingress-nginx cert-manager letsencrypt-prod ingress-aws-ip-
 clean: destroy-aurora-db clean-kube
 
 include $(root)/makefiles/aws-eks.mk
+include $(root)/makefiles/dns.mk
 include $(root)/makefiles/aws-aurora.mk
 include $(root)/makefiles/camunda.mk
 include $(root)/makefiles/letsencrypt.mk

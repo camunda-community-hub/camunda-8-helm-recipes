@@ -24,6 +24,7 @@ setup-metrics: metrics
 setup-nginx-ingress: ingress-nginx cert-manager letsencrypt-prod
 
 include $(root)/makefiles/aws-eks.mk
+include $(root)/makefiles/dns.mk
 include $(root)/makefiles/letsencrypt.mk
 include $(root)/makefiles/ingress-nginx.mk
 include $(root)/makefiles/metrics.mk
