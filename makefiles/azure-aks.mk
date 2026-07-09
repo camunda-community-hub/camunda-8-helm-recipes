@@ -5,7 +5,7 @@ kube-aks:
       --resource-group $(DEPLOYMENT_NAME)-rg \
       --name $(DEPLOYMENT_NAME) \
       --node-vm-size $(AZURE_MACHINE_TYPE) \
-      --node-count 1 \
+      --node-count $(AZURE_NODE_COUNT) \
       --vm-set-type VirtualMachineScaleSets \
       --enable-cluster-autoscaler \
       --min-count $(MIN_SIZE) \
@@ -54,6 +54,7 @@ clean-kube: clean-kube-aks
 use-kube:
 	kubectl config unset clusters.$(DEPLOYMENT_NAME)
 	kubectl config unset users.clusterUser_$(DEPLOYMENT_NAME)-rg_$(DEPLOYMENT_NAME)
+	kubectl config unset contexts.$(DEPLOYMENT_NAME)
 	az aks get-credentials --resource-group $(DEPLOYMENT_NAME)-rg --name $(DEPLOYMENT_NAME)
 
 .PHONY: connect-aks
