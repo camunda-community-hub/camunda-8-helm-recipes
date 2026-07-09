@@ -18,4 +18,5 @@ all: gateway-traefik
 clean: clean-gateway-traefik
 
 include $(root)/makefiles/gateway-traefik.mk
+include $(root)/makefiles/dns.mk
 include $(root)/makefiles/letsencrypt.mk
