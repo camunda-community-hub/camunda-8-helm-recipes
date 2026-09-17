@@ -22,5 +22,5 @@ SCALE_REPLICATION_FACTOR ?= 3
 BENCHMARK_TENANT_ID ?= <default>
 BENCHMARK_CLIENT_ID ?= benchmark
 BENCHMARK_TOKEN_URL ?= http://camunda-keycloak/auth/realms/camunda-platform/protocol/openid-connect/token
-BENCHMARK_TOKEN_AUDIENCE ?= zeebe-api
+BENCHMARK_TOKEN_AUDIENCE ?= orchestration-api
 BENCHMARK_CLIENT_SECRET ?= changeme

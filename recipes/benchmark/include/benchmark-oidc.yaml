@@ -38,9 +38,10 @@ spec:
               secretKeyRef:
                 name: benchmark-credentials
                 key: client-secret
-          - name: JAVA_OPTIONS
+          - name: JAVA_TOOL_OPTIONS
             value: >-
-              -Dcamunda.client.mode=selfmanaged
+              -Dcamunda.client.mode=self-managed
+              -Dcamunda.client.auth.method=oidc
               -Dcamunda.client.zeebe.grpc-address=http://camunda-zeebe-gateway:26500
               -Dcamunda.client.zeebe.prefer-rest-over-grpc=false
               -Dcamunda.client.zeebe.request-timeout=600s
@@ -49,8 +50,9 @@ spec:
               -Dzeebe.client.worker.max-jobs-active=2000
               -Dcamunda.client.auth.client-id=$(BENCHMARK_CLIENT_ID)
               -Dcamunda.client.auth.client-secret=$(BENCHMARK_CLIENT_SECRET)
+              -Dcamunda.client.auth.issuer-url=${BENCHMARK_ISSUER_URL}
               -Dcamunda.client.auth.token-url=$(BENCHMARK_TOKEN_URL)
-              -Dcamunda.client.zeebe.audience=$(BENCHMARK_TOKEN_AUDIENCE)
+              -Dcamunda.client.auth.audience=$(BENCHMARK_TOKEN_AUDIENCE)
               -Dcamunda.client.tenant-id=${BENCHMARK_TENANT_ID}
               -Dbenchmark.startPiPerSecond=${BENCHMARK_START_PI_PER_SECOND}
               -Dbenchmark.maxBackpressurePercentage=1.0

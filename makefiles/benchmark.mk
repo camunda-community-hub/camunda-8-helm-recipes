@@ -7,7 +7,8 @@ BENCHMARK_WARMUP_DURATION_MS ?= 3000
 BENCHMARK_TENANT_ID ?= <default>
 BENCHMARK_CLIENT_ID ?= benchmark
 BENCHMARK_TOKEN_URL ?= http://camunda-keycloak/auth/realms/camunda-platform/protocol/openid-connect/token
-BENCHMARK_TOKEN_AUDIENCE ?= zeebe-api
+BENCHMARK_ISSUER_URL ?= $(patsubst %/protocol/openid-connect/token,%,$(BENCHMARK_TOKEN_URL))
+BENCHMARK_TOKEN_AUDIENCE ?= orchestration-api
 BENCHMARK_CLIENT_SECRET ?= changeme
 
 # Common env exports and envsubst variable list shared by both deploy targets
@@ -31,15 +32,18 @@ benchmark-oidc: create-benchmark-credentials _benchmark-payload
 	BENCHMARK_TENANT_ID='$(BENCHMARK_TENANT_ID)' \
 	BENCHMARK_CLIENT_ID=$(BENCHMARK_CLIENT_ID) \
 	BENCHMARK_TOKEN_URL=$(BENCHMARK_TOKEN_URL) \
+	BENCHMARK_ISSUER_URL=$(BENCHMARK_ISSUER_URL) \
 	BENCHMARK_TOKEN_AUDIENCE=$(BENCHMARK_TOKEN_AUDIENCE) \
-	  envsubst '$(_BENCHMARK_VARS) $$BENCHMARK_TENANT_ID $$BENCHMARK_CLIENT_ID $$BENCHMARK_TOKEN_URL $$BENCHMARK_TOKEN_AUDIENCE' \
+	  envsubst '$(_BENCHMARK_VARS) $$BENCHMARK_TENANT_ID $$BENCHMARK_CLIENT_ID $$BENCHMARK_TOKEN_URL $$BENCHMARK_ISSUER_URL $$BENCHMARK_TOKEN_AUDIENCE' \
 	  < $(root)/recipes/benchmark/include/benchmark-oidc.yaml | kubectl apply -f - -n $(BENCHMARK_NAMESPACE)
+
+BENCHMARK_PAYLOAD_FILE ?= $(root)/recipes/benchmark/include/payload.json
 
 .PHONY: _benchmark-payload
 _benchmark-payload:
 	-kubectl delete configmap benchmark-payload -n $(BENCHMARK_NAMESPACE) 2>/dev/null || true
 	kubectl create configmap benchmark-payload \
-	  --from-file=payload.json=$(root)/recipes/benchmark/include/payload.json \
+	  --from-file=payload.json=$(BENCHMARK_PAYLOAD_FILE) \
 	  -n $(BENCHMARK_NAMESPACE)
 
 .PHONY: create-benchmark-credentials # create the benchmark-credentials secret from BENCHMARK_CLIENT_SECRET
