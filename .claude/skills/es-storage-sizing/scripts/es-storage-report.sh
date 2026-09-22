@@ -44,7 +44,20 @@ RESULTS_DIR="${ES_REPORT_DIR:-./es-storage-results}"
 # Indices that actually grow with process instance activity. Deliberately excludes
 # static/identity indices (camunda-authorization, camunda-role, camunda-tenant, ...)
 # which don't scale with benchmark load.
-INDEX_PATTERN="operate-list-view-*,operate-flownode-instance-*,operate-variable-*,operate-job-*,operate-event-*,operate-sequence-flow-*,operate-incident-*,tasklist-task-*,tasklist-task-variable-*"
+ORCHESTRATION_INDEX_PATTERN="operate-list-view-*,operate-flownode-instance-*,operate-variable-*,operate-job-*,operate-event-*,operate-sequence-flow-*,operate-incident-*,tasklist-task-*,tasklist-task-variable-*"
+
+# All Optimize indices. Unlike the orchestration pattern above, this is a blanket
+# wildcard rather than a curated list: Optimize's storage model (which of its
+# indices scale with instance volume vs. stay fixed-size administrative/reporting
+# state — dashboards, reports, settings, import-position bookkeeping) hasn't been
+# characterized yet, so we track everything and let the measured delta reveal it.
+OPTIMIZE_INDEX_PATTERN="optimize-*"
+
+INDEX_PATTERN="${ORCHESTRATION_INDEX_PATTERN},${OPTIMIZE_INDEX_PATTERN}"
+
+# jq boolean expressions (over a single _cat/indices row) selecting each category.
+JQ_IS_OPTIMIZE='(.index | startswith("optimize-"))'
+JQ_IS_ORCHESTRATION='(.index | startswith("optimize-") | not)'
 
 require() {
   command -v "$1" >/dev/null 2>&1 || { echo "error: '$1' is required but not found in PATH" >&2; exit 1; }
@@ -66,6 +79,12 @@ es_curl() {
     curl -s "http://localhost:9200${path}" "$@" 2>/dev/null
 }
 
+# sum_field <indices.json file> <field: pri.store.size|store.size> <jq bool expr>
+sum_field() {
+  local file="$1" field="$2" filter="$3"
+  jq --arg f "$field" "[.[] | select($filter) | .[\$f] | tonumber] | add // 0" "$file"
+}
+
 cmd_snapshot() {
   local label="${1:?usage: snapshot <label>}"
   mkdir -p "$RESULTS_DIR"
@@ -82,13 +101,17 @@ cmd_snapshot() {
   active=$(cmd_active_count)
   echo "$active" > "$RESULTS_DIR/$label.active"
 
-  local pri_total
-  pri_total=$(jq '[.[]["pri.store.size"] | tonumber] | add // 0' "$indices_file")
+  local pri_orchestration pri_optimize pri_total
+  pri_orchestration=$(sum_field "$indices_file" "pri.store.size" "$JQ_IS_ORCHESTRATION")
+  pri_optimize=$(sum_field "$indices_file" "pri.store.size" "$JQ_IS_OPTIMIZE")
+  pri_total=$(( pri_orchestration + pri_optimize ))
 
   echo "Snapshot '$label' saved to $indices_file"
-  echo "  completed instances so far : $completed"
-  echo "  active (non-terminal) now  : $active"
-  echo "  tracked-index primaries    : $pri_total bytes"
+  echo "  completed instances so far      : $completed"
+  echo "  active (non-terminal) now       : $active"
+  echo "  orchestration primaries         : $pri_orchestration bytes"
+  echo "  optimize primaries              : $pri_optimize bytes"
+  echo "  combined primaries              : $pri_total bytes"
 }
 
 cmd_active_count() {
@@ -159,6 +182,8 @@ cmd_settle() {
     elapsed=$(( elapsed + poll ))
   done
 
+  cmd_wait_optimize_import
+
   echo "Flushing tracked indices..."
   es_curl "/${INDEX_PATTERN}/_flush" -X POST > /dev/null
 
@@ -166,6 +191,79 @@ cmd_settle() {
   es_curl "/${INDEX_PATTERN}/_forcemerge?max_num_segments=1" -X POST > /dev/null
 
   echo "Settled. Safe to snapshot now."
+}
+
+cmd_wait_optimize_import() {
+  # Optimize imports from Zeebe/orchestration data on its own independent cadence,
+  # decoupled from Operate's post-importer-queue above. It has no exposed "pending
+  # count" like Operate's queue, so we poll optimize-process-instance-* doc counts
+  # (one index per BPMN process id) and wait for them to stop growing instead of
+  # waiting for an absolute target.
+  #
+  # This matters: without it, Optimize can still be importing a PRIOR run's
+  # backlog while THIS run's "before" snapshot is taken (or still catching up when
+  # the "after" snapshot is taken), which attributes one run's Optimize storage
+  # growth to a different run's instance count — measured directly: a run
+  # immediately after a heavy prior run showed Optimize at ~4-5x the expected
+  # per-instance cost because Optimize was still draining the prior run's backlog.
+  local has_optimize
+  has_optimize=$(es_curl "/_cat/indices/optimize-process-instance-*?h=index" | head -1)
+  [ -n "$has_optimize" ] || return 0
+
+  local max_wait="${OPTIMIZE_IMPORT_MAX_WAIT_SECONDS:-300}"
+  local poll="${OPTIMIZE_IMPORT_POLL_SECONDS:-10}"
+  local elapsed=0
+  local prev=-1
+
+  echo "Waiting for Optimize's importer to catch up (max ${max_wait}s)..."
+  while true; do
+    local count
+    count=$(es_curl "/optimize-process-instance-*/_count" | jq '.count // 0')
+    echo "  optimize process-instance docs: $count (elapsed ${elapsed}s)"
+    if [ "$count" -eq "$prev" ]; then
+      echo "Optimize import looks caught up (doc count stable)."
+      return 0
+    fi
+    prev="$count"
+    if [ "$elapsed" -ge "$max_wait" ]; then
+      echo "warning: Optimize's process-instance doc count was still growing after ${max_wait}s — giving up and continuing." >&2
+      echo "warning: this run's Optimize numbers may include catch-up from a prior run's backlog; treat them as noisier." >&2
+      return 0
+    fi
+    sleep "$poll"
+    elapsed=$(( elapsed + poll ))
+  done
+}
+
+# report_category <title> <jq bool expr> <before_file> <after_file> <instances> <payload_total>
+report_category() {
+  local title="$1" filter="$2" before_file="$3" after_file="$4" instances="$5" payload_total="$6"
+
+  local pri_before pri_after total_before total_after
+  pri_before=$(sum_field "$before_file" "pri.store.size" "$filter")
+  pri_after=$(sum_field "$after_file" "pri.store.size" "$filter")
+  total_before=$(sum_field "$before_file" "store.size" "$filter")
+  total_after=$(sum_field "$after_file" "store.size" "$filter")
+
+  local pri_delta=$(( pri_after - pri_before ))
+  local total_delta=$(( total_after - total_before ))
+
+  echo "--- $title ---"
+  echo "ES delta, primaries only          : $pri_delta bytes"
+  echo "ES delta, primaries + replicas    : $total_delta bytes"
+  awk -v p="$pri_delta" -v n="$instances" 'BEGIN {
+    printf "Per-instance ES bytes (primaries) : %d bytes\n", p/n
+  }'
+  awk -v t="$total_delta" -v n="$instances" 'BEGIN {
+    printf "Per-instance ES bytes (total)     : %d bytes\n", t/n
+  }'
+  awk -v p="$pri_delta" -v t="$payload_total" 'BEGIN {
+    printf "Expansion ratio, primaries only   : %.2fx (%.0f%%)\n", p/t, (p/t)*100
+  }'
+  awk -v tot="$total_delta" -v t="$payload_total" 'BEGIN {
+    printf "Expansion ratio, incl. replicas   : %.2fx (%.0f%%)\n", tot/t, (tot/t)*100
+  }'
+  echo
 }
 
 cmd_diff() {
@@ -188,14 +286,6 @@ cmd_diff() {
     exit 1
   fi
 
-  local pri_before pri_after total_before total_after
-  pri_before=$(jq '[.[]["pri.store.size"] | tonumber] | add // 0' "$before_file")
-  pri_after=$(jq '[.[]["pri.store.size"] | tonumber] | add // 0' "$after_file")
-  total_before=$(jq '[.[]["store.size"] | tonumber] | add // 0' "$before_file")
-  total_after=$(jq '[.[]["store.size"] | tonumber] | add // 0' "$after_file")
-
-  local pri_delta=$(( pri_after - pri_before ))
-  local total_delta=$(( total_after - total_before ))
   local payload_total=$(( instances * payload_bytes ))
 
   echo "=== ES storage report: $before -> $after ==="
@@ -203,25 +293,18 @@ cmd_diff() {
   echo "Payload bytes per instance        : $payload_bytes"
   echo "Total payload bytes ingested      : $payload_total"
   echo
-  echo "ES delta, primaries only          : $pri_delta bytes"
-  echo "ES delta, primaries + replicas    : $total_delta bytes"
-  echo
-  awk -v p="$pri_delta" -v n="$instances" -v pb="$payload_bytes" 'BEGIN {
-    printf "Per-instance ES bytes (primaries) : %d bytes  (payload was %d bytes/instance)\n", p/n, pb
-  }'
-  awk -v t="$total_delta" -v n="$instances" 'BEGIN {
-    printf "Per-instance ES bytes (total)     : %d bytes\n", t/n
-  }'
-  echo
-  awk -v p="$pri_delta" -v t="$payload_total" 'BEGIN {
-    printf "Expansion ratio, primaries only   : %.2fx (%.0f%%)\n", p/t, (p/t)*100
-  }'
-  awk -v tot="$total_delta" -v t="$payload_total" 'BEGIN {
-    printf "Expansion ratio, incl. replicas   : %.2fx (%.0f%%)\n", tot/t, (tot/t)*100
-  }'
-  echo
+
+  report_category "Orchestration cluster (operate-*, tasklist-*)" \
+    "$JQ_IS_ORCHESTRATION" "$before_file" "$after_file" "$instances" "$payload_total"
+  report_category "Optimize (optimize-*)" \
+    "$JQ_IS_OPTIMIZE" "$before_file" "$after_file" "$instances" "$payload_total"
+  report_category "Combined (orchestration + optimize)" \
+    "true" "$before_file" "$after_file" "$instances" "$payload_total"
+
   echo "Note: run this at 2-3 different payload sizes and compare per-instance bytes"
   echo "to separate fixed per-instance overhead from the marginal cost of payload bytes."
+  echo "Note: the Optimize figure includes all optimize-* indices (dashboards, reports,"
+  echo "settings, import bookkeeping, etc.), not just per-instance data — see SKILL.md."
 }
 
 case "${1:-}" in

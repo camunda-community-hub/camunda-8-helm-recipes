@@ -19,20 +19,77 @@ cluster rather than a guess.
 
 ## How it works
 
-1. Snapshot the size of Camunda's ES indices (`operate-*`, `tasklist-*`) and the
-   count of completed process instances.
+1. Snapshot the size of Camunda's ES indices and the count of completed process
+   instances. Two categories are tracked **separately** as well as combined:
+   - **Orchestration cluster**: `operate-*` / `tasklist-*` (a curated list of the
+     families that actually scale with instance volume — see `es-storage-report.sh`).
+   - **Optimize**: `optimize-*` (all of it — see the caveat below).
 2. Run the `camunda-8-benchmark` load-generation tool against the cluster for a
    fixed window, using a payload of a known byte size, targeting an
    **already-deployed** process.
 3. Let in-flight instances drain, tear the benchmark tool down, let Elasticsearch
-   settle (flush + force-merge to 1 segment — otherwise Lucene segment-compaction
-   state biases the size comparison).
-4. Snapshot again and diff: `(ES bytes added) / (instances completed)` gives
-   per-instance storage cost at that payload size.
+   settle (flush + force-merge to 1 segment on every tracked index, orchestration
+   and Optimize alike — otherwise Lucene segment-compaction state biases the size
+   comparison).
+4. Snapshot again and diff, per category and combined: `(ES bytes added) / (instances
+   completed)` gives per-instance storage cost at that payload size.
 5. Repeat at 2-4 different payload sizes (e.g. 1KB, 5KB, 10KB, 20KB) and fit a
    line through the results to separate the fixed per-instance overhead (workflow
    history, flow-node/variable documents, indices overhead) from the marginal
-   cost of payload bytes.
+   cost of payload bytes — do this once for orchestration, once for Optimize, and
+   once combined, since they may not share the same slope/intercept.
+
+### Optimize: what "separately" means here
+
+Optimize is only enabled if the target cluster has `optimize.enabled: true` (in
+the recipe's `my-camunda-values.yaml`, overriding the chart's own default). If
+it's disabled, the Optimize category will simply report ~0 delta throughout —
+that's expected, not a bug.
+
+**Confirmed by measurement**: Optimize *does* store a full per-instance record —
+it's just not visible until instances actually flow through it. Its per-process
+index is named `optimize-process-instance-<bpmnProcessId, lowercased>_v<N>` (e.g.
+`optimize-process-instance-eighttasksprocess_v8`), created lazily on first import,
+which is why it looked absent on first inspection before any load had run.
+Internally it uses Elasticsearch nested fields for flow-node/variable data, so
+`docs.count` from `_cat/indices` on that index is inflated by hidden nested child
+documents (~30x the actual instance count observed) — use `_count` (a real search
+query) for the true per-instance document count, not `_cat/indices`.
+
+Measured Optimize storage cost is **substantially higher per instance than
+Orchestration's**, and grows faster than linearly with payload size in the one
+sweep run so far (see the customer report for the actual figures) — plausibly
+because the nested doc structure duplicates variable content with more overhead
+per byte than Operate's flatter model. This is a first measurement, not a settled
+characterization: repeat runs, and ideally engineering input on Optimize's
+storage model, would be needed before treating the scaling shape as reliable.
+
+Because per-index scaling behavior isn't fully characterized, `OPTIMIZE_INDEX_PATTERN`
+in `es-storage-report.sh` stays a blanket `optimize-*` wildcard rather than a
+curated list — report the Optimize number as "total Optimize footprint growth,"
+and call out in any customer-facing writeup whether it turned out to scale with
+instances or stayed flat.
+
+**Optimize import lag is real and must be waited out separately from Operate's.**
+Optimize imports from Zeebe/orchestration data on its own cadence, decoupled from
+Operate's post-importer-queue. `cmd_settle` in `es-storage-report.sh` now also
+polls `optimize-process-instance-*` doc counts and waits for them to stop growing
+before flushing/force-merging (`cmd_wait_optimize_import`, `OPTIMIZE_IMPORT_MAX_WAIT_SECONDS`,
+default 300s) — without this, a run's "before" snapshot can be taken while
+Optimize is still draining a *prior* run's backlog, which then lands inside the
+*current* run's measured delta and inflates its per-instance number. This was
+observed directly: an early run without this wait measured ~4.7x the expected
+per-instance cost. Two things to know about this check:
+- It only confirms *count* has stabilized, not that all in-place *updates* to
+  existing documents (e.g. late-arriving nested variable data) have finished —
+  it's a reasonable proxy, not a guarantee. If a run's Optimize number looks
+  anomalously high, check whether `optimize-process-instance-*` size (not just
+  count) was still moving right after that run.
+- Also watch the primaries-vs-replicas ratio for `optimize-process-instance-*`
+  in the raw indices — it should sit at a stable ~2x (1 replica) between snapshots.
+  If it doesn't, one snapshot likely landed mid-replica-sync, which inflates the
+  "incl. replicas" delta without the "primaries" delta being affected. When in
+  doubt, trust the primaries-only figures over the replicated total for a given run.
 
 ## Prerequisites
 
@@ -95,18 +152,26 @@ Run this 2-4 times at different `PAYLOAD_SIZE_BYTES` values (a good spread:
 ~500B, ~1-2KB, ~10KB, ~20KB) with distinct labels. Results land in
 `$BENCHMARK_DIR/es-storage-results/<label>-{before,after}.{indices.json,completed,active}`.
 
-Each run prints a report ending in:
+Each run prints three blocks — Orchestration cluster, Optimize, and Combined —
+each shaped like:
 
 ```
-Per-instance ES bytes (primaries) : NNNNN bytes  (payload was NNNN bytes/instance)
+--- Orchestration cluster (operate-*, tasklist-*) ---
+ES delta, primaries only          : NNNNN bytes
+ES delta, primaries + replicas    : NNNNN bytes
+Per-instance ES bytes (primaries) : NNNNN bytes
 Per-instance ES bytes (total)     : NNNNN bytes
 Expansion ratio, primaries only   : N.NNx (NNN%)
 Expansion ratio, incl. replicas   : N.NNx (NNN%)
 ```
 
-Collect these across runs, then fit `bytes_per_instance = intercept + slope × payload_bytes`
-via least-squares over the (payload_bytes, per-instance-bytes) pairs — separately
-for primaries and primaries+replicas — and report R² alongside it.
+Collect the per-instance-bytes figures across runs, then fit
+`bytes_per_instance = intercept + slope × payload_bytes` via least-squares over
+the (payload_bytes, per-instance-bytes) pairs — separately for each of the three
+blocks, and separately for primaries vs. primaries+replicas within each — and
+report R² alongside every fit. Present Orchestration and Optimize numbers next
+to each other in any customer-facing report; don't only report Combined, since
+a customer with Optimize disabled needs the Orchestration-only numbers.
 
 ### Reusable sub-commands
 
@@ -146,3 +211,9 @@ export BENCHMARK_NAMESPACE=camunda CAMUNDA_RELEASE_NAME=camunda
   **primaries+replicas** delta (cluster-wide storage budget) — customers usually
   want the replicated total for capacity planning, but the primaries number is the
   cleaner "true cost per instance" figure.
+- **Optimize's per-instance cost, if any, is a separate line item from Orchestration's**,
+  not a multiplier on it — don't assume a fixed ratio between the two categories
+  transfers across payload sizes or process complexity (Optimize's cost, if
+  nonzero, likely scales with flow-node/variable count and reporting configuration,
+  not raw payload bytes, since it isn't measured against payload bytes the way
+  Operate's document size is).
