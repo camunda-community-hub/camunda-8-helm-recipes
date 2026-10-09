@@ -27,7 +27,7 @@ make clean
 
    ```makefile
    BENCHMARK_CLIENT_ID = benchmark
-   BENCHMARK_TOKEN_URL = http://camunda-keycloak/auth/realms/camunda-platform/protocol/openid-connect/token
+   BENCHMARK_TOKEN_URL = http://keycloak-service:18080/auth/realms/camunda-platform/protocol/openid-connect/token
    BENCHMARK_TOKEN_AUDIENCE = zeebe-api
    BENCHMARK_CLIENT_SECRET = <your-client-secret>
    ```
