@@ -1,0 +1,62 @@
+# Elasticsearch cluster managed by the ECK operator, following the Camunda reference architecture:
+# https://docs.camunda.io/docs/self-managed/deployment/helm/configure/operator-based-infrastructure/#elasticsearch-deployment
+# Placeholders in <> are filled in by `make elasticsearch` (see makefiles/elasticsearch.mk).
+#
+# ECK creates:
+#   service  elasticsearch-es-http:9200        (ClusterIP, used by Camunda)
+#   secret   elasticsearch-es-elastic-user     (password of the `elastic` user)
+apiVersion: elasticsearch.k8s.elastic.co/v1
+kind: Elasticsearch
+metadata:
+  name: elasticsearch
+spec:
+  version: <ES_VERSION>
+  http:
+    tls:
+      selfSignedCertificate:
+        disabled: true
+  nodeSets:
+    - name: masters
+      count: <ES_NODE_COUNT>
+      config:
+        # Disable mmap for compatibility with containers that lack the required vm.max_map_count sysctl
+        node.store.allow_mmap: "false"
+        # Disable deprecation warnings - https://github.com/camunda/camunda/issues/26285
+        logger.org.elasticsearch.deprecation: "OFF"
+      podTemplate:
+        spec:
+          affinity:
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchExpressions:
+                      - key: elasticsearch.k8s.elastic.co/cluster-name
+                        operator: In
+                        values:
+                          - elasticsearch
+                  topologyKey: kubernetes.io/hostname
+          containers:
+            - name: elasticsearch
+              securityContext:
+                readOnlyRootFilesystem: true
+              env:
+                - name: ELASTICSEARCH_ENABLE_REST_TLS
+                  value: "false"
+                - name: READINESS_PROBE_TIMEOUT
+                  value: "300"
+              # ECK sets the JVM heap to 50% of the memory limit
+              resources:
+                requests:
+                  cpu: "<ES_CPU_REQUEST>"
+                  memory: <ES_MEMORY>
+                limits:
+                  cpu: "<ES_CPU_LIMIT>"
+                  memory: <ES_MEMORY>
+      volumeClaimTemplates:
+        - metadata:
+            name: elasticsearch-data
+          spec:
+            accessModes: [ReadWriteOnce]
+            resources:
+              requests:
+                storage: <ES_STORAGE_SIZE>

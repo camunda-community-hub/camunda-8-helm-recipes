@@ -1,11 +1,12 @@
-# OIDC authentication via Keycloak
-# Centralises all OIDC-related config: authentication method, issuer URLs,
-# client secrets / redirect URLs for every component, and the Identity→Keycloak
-# admin connection.
+# OIDC authentication via Keycloak (chart 15 / Camunda 8.10).
+# Centralises the OIDC settings shared by all components: authentication method, issuer URLs,
+# client secrets and redirect URLs, and the Identity to Keycloak admin connection.
 #
-# Combine with ONE of:
-#   identity-keycloak-internal-postgres.yaml  (bundled PostgreSQL)
-#   identity-keycloak-external-postgres.yaml  (external PostgreSQL)
+# Keycloak is not bundled in chart 15. Run it with recipes/keycloak (Keycloak operator): the service is
+# keycloak-service:18080, served under /auth, and the operator creates the keycloak-initial-admin secret.
+# Management Identity creates the <KEYCLOAK_REALM> realm, the OIDC clients and the first user at startup.
+#
+# Combine with identity-enabled.yaml.
 
 global:
   security:
@@ -14,11 +15,12 @@ global:
   identity:
     auth:
       enabled: true
+      type: KEYCLOAK
       publicIssuerUrl: <KEYCLOAK_EXT_URL>/auth/realms/<KEYCLOAK_REALM>
-      issuerBackendUrl: http://camunda-keycloak/auth/realms/<KEYCLOAK_REALM>
+      issuerBackendUrl: http://keycloak-service:18080/auth/realms/<KEYCLOAK_REALM>
       authUrl: <KEYCLOAK_EXT_URL>/auth/realms/<KEYCLOAK_REALM>/protocol/openid-connect/auth
-      tokenUrl: http://camunda-keycloak/auth/realms/<KEYCLOAK_REALM>/protocol/openid-connect/token
-      jwksUrl: http://camunda-keycloak/auth/realms/<KEYCLOAK_REALM>/protocol/openid-connect/certs
+      tokenUrl: http://keycloak-service:18080/auth/realms/<KEYCLOAK_REALM>/protocol/openid-connect/token
+      jwksUrl: http://keycloak-service:18080/auth/realms/<KEYCLOAK_REALM>/protocol/openid-connect/certs
 
       identity:
         redirectUrl: <IDENTITY_EXT_URL>/management
@@ -30,32 +32,28 @@ global:
         redirectUrl: <ORCHESTRATION_EXT_URL>/orchestration
 
       # The secret is required by Identity even when Optimize is disabled.
-      # redirectUrl is consumed by the Optimize chart template
-      # (global.identity.auth.optimize.redirectUrl -> ccsm.redirectRootUrl)
-      # and is harmless when Optimize is disabled.
+      # redirectUrl is harmless when Optimize is disabled.
       optimize:
         secret:
           existingSecret: camunda-credentials
           existingSecretKey: identity-optimize-client-token
         redirectUrl: <OPTIMIZE_EXT_URL>/optimize
 
-      webModeler:
+      camundaHub:
         redirectUrl: <WEB_MODELER_EXT_URL>/modeler
-
-      console:
-        redirectUrl: <CONSOLE_EXT_URL>/console 
 
     keycloak:
       url:
         protocol: http
-        host: camunda-keycloak
-        port: 80
-      # contextPath defaults to /auth
+        host: keycloak-service
+        port: "18080"
+      contextPath: /auth
       realm: /realms/<KEYCLOAK_REALM>
       auth:
         adminUser: <KEYCLOAK_ADMIN_USERNAME>
-        existingSecret: "camunda-credentials"
-        existingSecretKey: "identity-keycloak-admin-password"
+        secret:
+          existingSecret: keycloak-initial-admin
+          existingSecretKey: password
 
 connectors:
   security:

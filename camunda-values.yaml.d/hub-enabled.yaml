@@ -1,18 +1,52 @@
-# Camunda Hub (8.10+): replaces Web Modeler and Console.
-# Requires a PostgreSQL database; point externalDatabase at it.
-# Pair with oidc-external-keycloak.yaml (chart 15). Hub's pods are still named web-modeler-*.
+# Camunda Hub (chart 15 / Camunda 8.10): replaces Web Modeler and Console.
+# Needs a PostgreSQL database: run recipes/postgres (pg-hub cluster: service pg-hub-rw, secret pg-hub-secret).
+# Pair with oidc.yaml. Hub's pods and services are still named web-modeler-*.
 camundaHub:
   enabled: true
   contextPath: /modeler
+  # WebSocket public reachability for the browser client.
+  # The chart only fills these in from global.ingress when global.ingress.enabled=true.
+  # Recipes that use Traefik IngressRoute CRDs (no chart-managed Ingress) need them set here.
+  websockets:
+    publicHost: <YOUR_HOSTNAME>
+    publicPort: 443
+    env:
+      # The websocket server is mounted at /modeler-ws, so it accepts requests on that prefix instead of "/".
+      - name: PUSHER_APP_PATH
+        value: "/modeler-ws"
   restapi:
-    mail:
-      # Required, otherwise the restapi pod does not start.
-      fromAddress: noreply@example.com
-    externalDatabase:
-      host: "<POSTGRES_MODELER_HOST>"
-      port: 5432
-      database: "<POSTGRES_MODELER_DB>"
-      username: "<POSTGRES_MODELER_USERNAME>"
+    # Stable Pusher app key + secret from camunda-credentials so the values do not rotate on `helm upgrade`
+    # (the chart otherwise regenerates them on every render). restapi and websockets use the same refs.
+    pusher:
       secret:
-        existingSecret: "camunda-credentials"
-        existingSecretKey: "webmodeler-postgresql-user-password"
+        existingSecret: camunda-credentials
+        existingSecretKey: webmodeler-pusher-app-secret
+      client:
+        secret:
+          existingSecret: camunda-credentials
+          existingSecretKey: webmodeler-pusher-app-key
+    externalDatabase:
+      host: <POSTGRES_MODELER_HOST>
+      port: 5432
+      database: <POSTGRES_MODELER_DB>
+      username: <POSTGRES_MODELER_USERNAME>
+      secret:
+        existingSecret: pg-hub-secret
+        existingSecretKey: password
+    # Mail configuration is required, otherwise the restapi pod does not start. The mail.fromAddress and
+    # mail.fromName values are deprecated in chart 15, so they are supplied through unified configuration.
+    extraConfiguration:
+      - file: hub-mail.yaml
+        content: |
+          camunda:
+            modeler:
+              mail:
+                from-address: <REPLY_EMAIL>
+                from-name: Camunda Platform
+    env:
+      # The chart only sets the Pusher client path and TLS flag when global.ingress.enabled is true.
+      # Without a chart-managed Ingress (Traefik IngressRoute) they must be set here.
+      - name: CAMUNDA_HUB_PUSHER_CLIENT_FORCETLS
+        value: "true"
+      - name: CAMUNDA_HUB_PUSHER_CLIENT_PATH
+        value: "/modeler-ws"

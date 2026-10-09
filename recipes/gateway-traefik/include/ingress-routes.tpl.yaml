@@ -96,15 +96,15 @@ spec:
         - name: <CAMUNDA_RELEASE_NAME>-zeebe-gateway
           port: 8080
 
-    # Keycloak — served at /auth on the same domain
+    # Keycloak (operator-managed, recipes/keycloak) — served at /auth on the same domain
     - match: Host(`<YOUR_HOSTNAME>`) && PathPrefix(`/auth`)
       kind: Rule
       middlewares:
         - name: forward-https-headers
           namespace: <CAMUNDA_NAMESPACE>
       services:
-        - name: <CAMUNDA_RELEASE_NAME>-keycloak
-          port: 80
+        - name: keycloak-service
+          port: 18080
 
     # Identity
     - match: Host(`<YOUR_HOSTNAME>`) && PathPrefix(`/management`)
@@ -136,7 +136,7 @@ spec:
         - name: <CAMUNDA_RELEASE_NAME>-connectors
           port: 8080
 
-    # Web Modeler webapp
+    # Camunda Hub (Web Modeler and Console) webapp
     - match: Host(`<YOUR_HOSTNAME>`) && PathPrefix(`/modeler`)
       kind: Rule
       middlewares:
@@ -146,7 +146,7 @@ spec:
         - name: <CAMUNDA_RELEASE_NAME>-web-modeler-restapi
           port: 80
 
-    # Web Modeler WebSocket
+    # Camunda Hub WebSocket
     - match: Host(`<YOUR_HOSTNAME>`) && PathPrefix(`/modeler-ws`)
       kind: Rule
       middlewares:
@@ -154,16 +154,6 @@ spec:
           namespace: <CAMUNDA_NAMESPACE>
       services:
         - name: <CAMUNDA_RELEASE_NAME>-web-modeler-websockets
-          port: 80
-
-    # Console
-    - match: Host(`<YOUR_HOSTNAME>`) && PathPrefix(`/console`)
-      kind: Rule
-      middlewares:
-        - name: forward-https-headers
-          namespace: <CAMUNDA_NAMESPACE>
-      services:
-        - name: <CAMUNDA_RELEASE_NAME>-console
           port: 80
 
     # Root — redirect to Identity

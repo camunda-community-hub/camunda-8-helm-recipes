@@ -1,8 +1,14 @@
-global:
-  elasticsearch:
-    enabled: true
-
+# Orchestration Cluster secondary storage in Elasticsearch.
+# Points at the ECK-managed cluster from recipes/elasticsearch (service elasticsearch-es-http,
+# secret elasticsearch-es-elastic-user). Chart 15 does not bundle Elasticsearch.
 orchestration:
   data:
     secondaryStorage:
       type: elasticsearch
+      elasticsearch:
+        url: http://elasticsearch-es-http:9200
+        auth:
+          username: elastic
+          secret:
+            existingSecret: elasticsearch-es-elastic-user
+            existingSecretKey: elastic

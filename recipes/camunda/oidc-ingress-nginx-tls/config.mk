@@ -24,7 +24,6 @@ CAMUNDA_HELM_CHART_VERSION ?= 14.4.0
 CAMUNDA_VERSION ?= 8.9.0
 
 CAMUNDA_HELM_VALUES ?= \
-  $(root)/camunda-values.yaml.d/enable-elasticsearch.yaml \
   $(root)/camunda-values.yaml.d/enable-ingress-nginx.yaml \
   $(root)/camunda-values.yaml.d/enable-metrics.yaml \
   $(root)/camunda-values.yaml.d/connectors-enabled.yaml \

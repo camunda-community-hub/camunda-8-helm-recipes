@@ -1,8 +1,6 @@
 # Helm chart values are imported from `../../camunda-values.yaml.d` via `config.mk`.
 # This file only contains additional overrides.
 # Note that array values, e.g. `orchestration.env` can NOT be merged by Helm.
-elasticsearch:
-  enabled: true
 prometheusServiceMonitor:
   enabled: true
   labels:
@@ -14,11 +12,12 @@ global:
   identity:
     auth:
       enabled: true
+      type: KEYCLOAK
       publicIssuerUrl: https://example.com/auth/realms/camunda-platform
-      issuerBackendUrl: http://camunda-keycloak/auth/realms/camunda-platform
+      issuerBackendUrl: http://keycloak-service:18080/auth/realms/camunda-platform
       authUrl: https://example.com/auth/realms/camunda-platform/protocol/openid-connect/auth
-      tokenUrl: http://camunda-keycloak/auth/realms/camunda-platform/protocol/openid-connect/token
-      jwksUrl: http://camunda-keycloak/auth/realms/camunda-platform/protocol/openid-connect/certs
+      tokenUrl: http://keycloak-service:18080/auth/realms/camunda-platform/protocol/openid-connect/token
+      jwksUrl: http://keycloak-service:18080/auth/realms/camunda-platform/protocol/openid-connect/certs
       identity:
         redirectUrl: https://example.com/management
       orchestration:
@@ -27,31 +26,26 @@ global:
           existingSecretKey: identity-orchestration-client-token
         redirectUrl: https://example.com/orchestration
       # The secret is required by Identity even when Optimize is disabled.
-      # redirectUrl is consumed by the Optimize chart template
-      # (global.identity.auth.optimize.redirectUrl -> ccsm.redirectRootUrl)
-      # and is harmless when Optimize is disabled.
+      # redirectUrl is harmless when Optimize is disabled.
       optimize:
         secret:
           existingSecret: camunda-credentials
           existingSecretKey: identity-optimize-client-token
         redirectUrl: https://example.com/optimize
-      webModeler:
+      camundaHub:
         redirectUrl: https://example.com/modeler
-      console:
-        redirectUrl: https://example.com/console
     keycloak:
       url:
         protocol: http
-        host: camunda-keycloak
-        port: 80
-      # contextPath defaults to /auth
+        host: keycloak-service
+        port: "18080"
+      contextPath: /auth
       realm: /realms/camunda-platform
       auth:
-        adminUser: admin
-        existingSecret: "camunda-credentials"
-        existingSecretKey: "identity-keycloak-admin-password"
-  elasticsearch:
-    enabled: true
+        adminUser: temp-admin
+        secret:
+          existingSecret: keycloak-initial-admin
+          existingSecretKey: password
   multitenancy:
     enabled: true
 connectors:
@@ -62,54 +56,50 @@ connectors:
         secret:
           existingSecret: camunda-credentials
           existingSecretKey: identity-connectors-client-token
+# Management Identity on an external PostgreSQL database (chart 15 does not bundle PostgreSQL).
+# Run the database with recipes/postgres (pg-identity cluster: service pg-identity-rw, secret pg-identity-secret).
+# Combine with oidc.yaml for the Keycloak connection.
 identity:
   enabled: true
   contextPath: /management
   fullURL: https://example.com/management
   firstUser:
     secret:
-      existingSecret: "camunda-credentials"
-      existingSecretKey: "identity-first-user-password"
+      existingSecret: camunda-credentials
+      existingSecretKey: identity-first-user-password
   env:
     - name: KEYCLOAK_REALM
       value: camunda-platform
+  externalDatabase:
+    enabled: true
+    host: pg-identity-rw
+    port: 5432
+    database: identity
+    username: identity
+    secret:
+      existingSecret: pg-identity-secret
+      existingSecretKey: password
   multitenancy:
     enabled: true
-identityPostgresql:
+# Camunda Hub (chart 15 / Camunda 8.10): replaces Web Modeler and Console.
+# Needs a PostgreSQL database: run recipes/postgres (pg-hub cluster: service pg-hub-rw, secret pg-hub-secret).
+# Pair with oidc.yaml. Hub's pods and services are still named web-modeler-*.
+camundaHub:
   enabled: true
-  auth:
-    existingSecret: camunda-credentials
-# Keycloak will be installed and will use internally provisioned PostgreSQL database
-identityKeycloak:
-  enabled: true
-  postgresql:
-    auth:
-      existingSecret: camunda-credentials
-      # Override default key names so Keycloak's internal PostgreSQL
-      # shares the same secret keys as identityPostgresql:
-      secretKeys:
-        adminPasswordKey: identity-postgresql-admin-password
-        userPasswordKey: identity-postgresql-user-password
-webModeler:
   contextPath: /modeler
-  enabled: true
   # WebSocket public reachability for the browser client.
-  # The chart only auto-fills these from global.ingress when global.ingress.enabled=true.
+  # The chart only fills these in from global.ingress when global.ingress.enabled=true.
   # Recipes that use Traefik IngressRoute CRDs (no chart-managed Ingress) need them set here.
-  # For chart-managed Ingress recipes these are ignored — global.ingress.host wins.
   websockets:
     publicHost: example.com
     publicPort: 443
     env:
-      # Tell the websocket server it is mounted at /modeler-ws so it accepts
-      # requests on that prefix instead of "/".
+      # The websocket server is mounted at /modeler-ws, so it accepts requests on that prefix instead of "/".
       - name: PUSHER_APP_PATH
         value: "/modeler-ws"
   restapi:
-    # Stable Pusher app key + secret sourced from the camunda-credentials secret
-    # so values do not rotate on `helm upgrade` (the chart otherwise regenerates
-    # them via randAlphaNum on every render). Both restapi and websockets
-    # consume the same refs, so they always agree.
+    # Stable Pusher app key + secret from camunda-credentials so the values do not rotate on `helm upgrade`
+    # (the chart otherwise regenerates them on every render). restapi and websockets use the same refs.
     pusher:
       secret:
         existingSecret: camunda-credentials
@@ -118,54 +108,45 @@ webModeler:
         secret:
           existingSecret: camunda-credentials
           existingSecretKey: webmodeler-pusher-app-key
-    mail:
-      # This value is required, otherwise the restapi pod wouldn't start.
-      fromAddress: noreply@example.com
+    externalDatabase:
+      host: pg-hub-rw
+      port: 5432
+      database: hub
+      username: hub
+      secret:
+        existingSecret: pg-hub-secret
+        existingSecretKey: password
+    # Mail configuration is required, otherwise the restapi pod does not start. The mail.fromAddress and
+    # mail.fromName values are deprecated in chart 15, so they are supplied through unified configuration.
+    extraConfiguration:
+      - file: hub-mail.yaml
+        content: |
+          camunda:
+            modeler:
+              mail:
+                from-address: noreply@example.com
+                from-name: Camunda Platform
     env:
-      # Override pusher.client.force-tls and pusher.client.path in the restapi's
-      # application.yaml. Required when global.ingress.enabled is false — the
-      # chart hard-codes force-tls=false and omits the path in that case.
-      - name: CAMUNDA_MODELER_PUSHER_CLIENT_FORCETLS
+      # The chart only sets the Pusher client path and TLS flag when global.ingress.enabled is true.
+      # Without a chart-managed Ingress (Traefik IngressRoute) they must be set here.
+      - name: CAMUNDA_HUB_PUSHER_CLIENT_FORCETLS
         value: "true"
-      - name: CAMUNDA_MODELER_PUSHER_CLIENT_PATH
+      - name: CAMUNDA_HUB_PUSHER_CLIENT_PATH
         value: "/modeler-ws"
-      - name: CAMUNDA_MODELER_CLUSTERS_0_ID
-        value: "camunda-demo-cluster"
-      - name: CAMUNDA_MODELER_CLUSTERS_0_NAME
-        value: "Camunda Demo Cluster"
-      - name: CAMUNDA_MODELER_CLUSTERS_0_VERSION
-        value: "8.9.0"
-      - name: CAMUNDA_MODELER_CLUSTERS_0_AUTHENTICATION
-        value: "BEARER_TOKEN"
-      - name: CAMUNDA_MODELER_CLUSTERS_0_URL_GRPC
-        value: "grpc://camunda-zeebe-gateway:26500"
-      - name: CAMUNDA_MODELER_CLUSTERS_0_URL_REST
-        value: "http://camunda-zeebe-gateway"
-      - name: CAMUNDA_MODELER_CLUSTERS_0_URL_WEBAPP
-        value: "http://camunda-zeebe/orchestration"
-      - name: CAMUNDA_MODELER_CLUSTERS_0_AUTHORIZATIONS_ENABLED
-        value: "true"
-      - name: LOGGING_LEVEL_IO_GRPC
-        value: "TRACE"
-      - name: LOGGING_LEVEL_IO_CAMUNDA_MODELER
-        value: "DEBUG"
-      - name: SPRING_PROFILES_INCLUDE
-        value: "default-logging"
-      - name: CAMUNDA_MODELER_GITSYNC_GITHUB_BASEURL
-        value: https://api.github.com
-      - name: CAMUNDA_MODELER_GITSYNC_MAXFILES
-        value: "50"
-webModelerPostgresql:
-  enabled: true
-  auth:
-    existingSecret: "camunda-credentials"
-    secretKeys:
-      adminPasswordKey: webmodeler-postgresql-admin-password
-      userPasswordKey: webmodeler-postgresql-user-password
+# Orchestration Cluster secondary storage in Elasticsearch.
+# Points at the ECK-managed cluster from recipes/elasticsearch (service elasticsearch-es-http,
+# secret elasticsearch-es-elastic-user). Chart 15 does not bundle Elasticsearch.
 orchestration:
   data:
     secondaryStorage:
       type: elasticsearch
+      elasticsearch:
+        url: http://elasticsearch-es-http:9200
+        auth:
+          username: elastic
+          secret:
+            existingSecret: elasticsearch-es-elastic-user
+            existingSecretKey: elastic
   contextPath: /orchestration
   security:
     authentication:
@@ -174,52 +155,49 @@ orchestration:
           existingSecret: "camunda-credentials"
           existingSecretKey: "identity-orchestration-client-token"
         redirectUrl: https://example.com/orchestration
+    initialization:
+      # Grants the "connectors" role RESOURCE:CREATE so the benchmark tool (which
+      # authenticates as the "connectors" client) can deploy its BenchmarkProcess
+      # with benchmark.autoDeployProcess=true. Without this, deploys are rejected
+      # with FORBIDDEN and the benchmark starts zero process instances.
+      authorizations:
+        - ownerType: ROLE
+          ownerId: connectors
+          resourceType: RESOURCE
+          resourceId: "*"
+          permissions:
+            - CREATE
+            - READ
   multitenancy:
     checks:
       enabled: true
     api:
       enabled: true
-# Optimize connected to Elasticsearch.
-# Host/port/protocol fall back to global.elasticsearch settings
-# from enable-elasticsearch.yaml, so only component-specific overrides here.
+  resources:
+    limits:
+      cpu: "3"
+      memory: 6Gi
+    requests:
+      cpu: "2"
+      memory: 6Gi
+# Optimize connected to the ECK-managed Elasticsearch from recipes/elasticsearch.
 # OIDC redirect for Optimize is configured via global.identity.auth.optimize.redirectUrl
-# in oidc.yaml — the chart maps that to ccsm.redirectRootUrl in Optimize's app config.
+# in oidc.yaml.
 optimize:
   enabled: true
   contextPath: "/optimize"
+  database:
+    elasticsearch:
+      enabled: true
+      external: true
+      url:
+        protocol: http
+        host: elasticsearch-es-http
+        port: 9200
+      auth:
+        username: elastic
+        secret:
+          existingSecret: elasticsearch-es-elastic-user
+          existingSecretKey: elastic
   migration:
     enabled: false
-  env:
-    - name: ES_LOG_LEVEL
-      value: "trace"
-console:
-  enabled: true
-  contextPath: "/console"
-  overrideConfiguration: |
-    camunda:
-      console:
-        managed:
-          releases:
-            - name: "camunda"
-              namespace: "camunda"
-              components:
-                - id: "console"
-                  url: "https://example.com/console"
-                - id: "keycloak"
-                  url: "https://example.com/auth"
-                - id: "identity"
-                  url: "https://example.com/management"
-                - id: "webModelerWebApp"
-                  url: "https://example.com/modeler"
-                - id: "optimize"
-                  url: "https://example.com/optimize"
-                - id: "connectors"
-                  url: "https://example.com/connectors"
-                - id: "operate"
-                  url: "https://example.com/orchestration/operate"
-                - id: "tasklist"
-                  url: "https://example.com/orchestration/tasklist"
-                - id: "orchestration"
-                  urls:
-                    grpc: "https://grpc.example.com:443"
-                    http: "https://example.com/orchestration"

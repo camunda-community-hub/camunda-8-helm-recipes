@@ -1,0 +1,38 @@
+# One CloudNativePG PostgreSQL cluster, following the Camunda reference architecture:
+# https://docs.camunda.io/docs/self-managed/deployment/helm/configure/operator-based-infrastructure/#postgresql-deployment
+# Rendered once per cluster by `make postgres` (see makefiles/postgres.mk).
+#
+# CloudNativePG creates the service <name>-rw (read/write), which Camunda connects to.
+# Credentials come from the secrets <name>-secret and <name>-superuser-secret (created by `make postgres`).
+#
+# Two instances keep the node hosting a database drainable, and a dedicated WAL volume keeps
+# replication-slot retention out of PGDATA. Both are one-way changes: decide before the first install.
+# Single-node environments (for example Kind) set PG_INSTANCES=1.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: <PG_CLUSTER>
+spec:
+  instances: <PG_INSTANCES>
+  enablePDB: <PG_ENABLE_PDB>
+  affinity:
+    enablePodAntiAffinity: true
+    topologyKey: kubernetes.io/hostname
+    podAntiAffinityType: required
+  description: PostgreSQL cluster for <PG_DESCRIPTION>
+  imageName: <PG_IMAGE>
+  storage:
+    size: <PG_STORAGE_SIZE>
+  walStorage:
+    size: <PG_WAL_STORAGE_SIZE>
+  superuserSecret:
+    name: <PG_CLUSTER>-superuser-secret
+  seccompProfile:
+    type: RuntimeDefault
+  bootstrap:
+    initdb:
+      database: <PG_DATABASE>
+      owner: <PG_OWNER>
+      dataChecksums: true
+      secret:
+        name: <PG_CLUSTER>-secret

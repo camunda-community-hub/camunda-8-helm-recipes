@@ -1,0 +1,52 @@
+# Keycloak instance managed by the Keycloak operator, following the Camunda reference architecture:
+# https://docs.camunda.io/docs/self-managed/deployment/helm/configure/operator-based-infrastructure/#keycloak-deployment
+# Public URL: https://<KEYCLOAK_HOST>/auth. In the cluster: http://keycloak-service:18080/auth.
+# Needs the pg-keycloak PostgreSQL cluster (recipes/postgres).
+#
+# The operator creates the service `keycloak-service` and the secret `keycloak-initial-admin`
+# (the admin user, default temp-admin).
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: Keycloak
+metadata:
+  name: keycloak
+spec:
+  # Camunda-maintained image with the Camunda Identity login theme, the /auth base path and the AWS JDBC wrapper
+  image: docker.io/camunda/keycloak:quay-optimized-<KEYCLOAK_VERSION>
+  instances: 1
+  db:
+    # pg-keycloak-rw is the service of the CloudNativePG keycloak cluster.
+    # aws-wrapper is required for the optimized image (no impact on functionality).
+    url: jdbc:aws-wrapper:postgresql://pg-keycloak-rw:5432/<POSTGRES_KEYCLOAK_DB>
+    schema: public
+    usernameSecret:
+      name: pg-keycloak-secret
+      key: username
+    passwordSecret:
+      name: pg-keycloak-secret
+      key: password
+  http:
+    httpEnabled: true
+    # Port 18080 avoids a conflict with the Zeebe gateway on 8080 when port-forwarding
+    httpPort: 18080
+  additionalOptions:
+    - name: http-relative-path
+      value: /auth
+    # Proxy mode for correct HTTPS redirects behind the ingress or gateway
+    - name: proxy-headers
+      value: xforwarded
+  ingress:
+    # Disabled: the operator cannot manage the /auth sub-path. Ingress or gateway routes are separate.
+    enabled: false
+  hostname:
+    # Full URL with scheme and path so issuer URLs always use HTTPS and include /auth:
+    # https://<KEYCLOAK_HOST>/auth/realms/<realm>. Must match http-relative-path.
+    hostname: https://<KEYCLOAK_HOST>/auth
+    backchannelDynamic: false
+    strict: true
+  resources:
+    limits:
+      cpu: <KEYCLOAK_CPU_LIMIT>
+      memory: <KEYCLOAK_MEMORY>
+    requests:
+      cpu: <KEYCLOAK_CPU_REQUEST>
+      memory: <KEYCLOAK_MEMORY>

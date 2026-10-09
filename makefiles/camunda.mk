@@ -81,7 +81,8 @@ camunda-values.yaml: delete-camunda-values
 	     s|<CONSOLE_EXT_URL>|$(CONSOLE_EXT_URL)|g; \
 	     s|<WEB_MODELER_EXT_URL>|$(WEB_MODELER_EXT_URL)|g; \
 	     s|<POSTGRES_HOST>|$(POSTGRES_HOST)|g; \
-	     s|<POSTGRES_KEYCLOAK_HOST>|$(POSTGRES_KEYCLOAK_HOST)|g; \
+	     s|<POSTGRES_IDENTITY_HOST>|$(POSTGRES_IDENTITY_HOST)|g; \
+     s|<POSTGRES_KEYCLOAK_HOST>|$(POSTGRES_KEYCLOAK_HOST)|g; \
 	     s|<POSTGRES_KEYCLOAK_DB>|$(POSTGRES_KEYCLOAK_DB)|g; \
 	     s|<POSTGRES_KEYCLOAK_USERNAME>|$(POSTGRES_KEYCLOAK_USERNAME)|g; \
 	     s|<POSTGRES_MODELER_HOST>|$(POSTGRES_MODELER_HOST)|g; \
@@ -138,7 +139,7 @@ port-identity:
 
 .PHONY: port-keycloak
 port-keycloak:
-	kubectl port-forward svc/$(CAMUNDA_RELEASE_NAME)-keycloak 18080:80 -n $(CAMUNDA_NAMESPACE)
+	kubectl port-forward svc/keycloak-service 18080:18080 -n $(CAMUNDA_NAMESPACE)
 
 .PHONY: port-modeler
 port-modeler:

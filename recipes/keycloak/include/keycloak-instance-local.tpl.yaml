@@ -1,0 +1,39 @@
+# Keycloak instance for local development without a domain, following the Camunda reference architecture.
+# Reachable in the cluster as http://keycloak-service:18080/auth and through port-forwarding.
+# To use it from your machine add `127.0.0.1 keycloak-service` to /etc/hosts and use that hostname.
+# Needs the pg-keycloak PostgreSQL cluster (recipes/postgres).
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: Keycloak
+metadata:
+  name: keycloak
+spec:
+  image: docker.io/camunda/keycloak:quay-optimized-<KEYCLOAK_VERSION>
+  instances: 1
+  db:
+    url: jdbc:aws-wrapper:postgresql://pg-keycloak-rw:5432/<POSTGRES_KEYCLOAK_DB>
+    schema: public
+    usernameSecret:
+      name: pg-keycloak-secret
+      key: username
+    passwordSecret:
+      name: pg-keycloak-secret
+      key: password
+  http:
+    httpEnabled: true
+    httpPort: 18080
+  additionalOptions:
+    - name: http-relative-path
+      value: /auth
+  ingress:
+    enabled: false
+  hostname:
+    # The service name as hostname, so tokens are signed with an issuer reachable in the cluster
+    hostname: keycloak-service
+    strict: false
+  resources:
+    limits:
+      cpu: <KEYCLOAK_CPU_LIMIT>
+      memory: <KEYCLOAK_MEMORY>
+    requests:
+      cpu: <KEYCLOAK_CPU_REQUEST>
+      memory: <KEYCLOAK_MEMORY>

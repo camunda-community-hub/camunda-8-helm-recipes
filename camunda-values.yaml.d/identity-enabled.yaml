@@ -1,0 +1,23 @@
+# Management Identity on an external PostgreSQL database (chart 15 does not bundle PostgreSQL).
+# Run the database with recipes/postgres (pg-identity cluster: service pg-identity-rw, secret pg-identity-secret).
+# Combine with oidc.yaml for the Keycloak connection.
+identity:
+  enabled: true
+  contextPath: /management
+  fullURL: <IDENTITY_EXT_URL>/management
+  firstUser:
+    secret:
+      existingSecret: camunda-credentials
+      existingSecretKey: identity-first-user-password
+  env:
+    - name: KEYCLOAK_REALM
+      value: <KEYCLOAK_REALM>
+  externalDatabase:
+    enabled: true
+    host: <POSTGRES_IDENTITY_HOST>
+    port: 5432
+    database: <POSTGRES_IDENTITY_DB>
+    username: <POSTGRES_IDENTITY_USERNAME>
+    secret:
+      existingSecret: pg-identity-secret
+      existingSecretKey: password

@@ -1,8 +1,19 @@
-# Optimize connected to Elasticsearch.
-# Host/port/protocol fall back to global.elasticsearch settings
-# from enable-elasticsearch.yaml, so only component-specific overrides here.
+# Optimize connected to the ECK-managed Elasticsearch from recipes/elasticsearch.
 # OIDC redirect for Optimize is configured via global.identity.auth.optimize.redirectUrl
-# in oidc.yaml — the chart maps that to ccsm.redirectRootUrl in Optimize's app config.
+# in oidc.yaml.
 optimize:
   enabled: true
   contextPath: "/optimize"
+  database:
+    elasticsearch:
+      enabled: true
+      external: true
+      url:
+        protocol: http
+        host: elasticsearch-es-http
+        port: 9200
+      auth:
+        username: elastic
+        secret:
+          existingSecret: elasticsearch-es-elastic-user
+          existingSecretKey: elastic
