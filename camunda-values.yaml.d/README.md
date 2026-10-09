@@ -7,6 +7,12 @@ i.e. Camunda Helm Chart 14 and higher.
 Example configurations for older versions can be found in the old repository of
 [Camunda 8 Helm Profiles](https://github.com/camunda-community-hub/camunda-8-helm-profiles).
 
+> [!NOTE]
+> A few files target **Helm chart 15 / Camunda 8.10 (alpha)** only: `hub-enabled.yaml`, `oidc-external-keycloak.yaml`,
+> `ingress-nginx-host.yaml` and `identity-own-hostname.yaml`. They supersede their chart 14 counterparts
+> (`modeler-*.yaml`, `oidc.yaml` + `identity-keycloak-*.yaml`, `enable-ingress-nginx.yaml`) and each carries a header
+> comment naming the chart. Do not mix chart 14 and chart 15 fragments in one recipe.
+
 ## Purpose
 
 The `camunda-values.yaml.d` directory serves as a shared library of configuration components that:

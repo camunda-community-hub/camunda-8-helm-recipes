@@ -11,7 +11,8 @@ delete-certs-dir:
 # create CA private key
 .PHONY: create-ca-private-key
 create-ca-private-key: create-certs-dir delete-ca-private-key
-	openssl genrsa -des3 -out ./certs/$(CERT_NAME)CA.key 2048
+	# Set CA_KEY_PASS to run non-interactively; otherwise openssl prompts for a passphrase.
+	openssl genrsa $(if $(CA_KEY_PASS),-aes256 -passout pass:$(CA_KEY_PASS),-des3) -out ./certs/$(CERT_NAME)CA.key 2048
 
 .PHONY: delete-ca-private-key
 delete-ca-private-key:
@@ -20,7 +21,7 @@ delete-ca-private-key:
 # create CA certificate
 .PHONY: create-ca-pem
 create-ca-pem: create-certs-dir delete-ca-pem
-	openssl req -x509 -new -nodes -key ./certs/$(CERT_NAME)CA.key -sha256 -days 365 \
+	openssl req -x509 -new -nodes -key ./certs/$(CERT_NAME)CA.key $(if $(CA_KEY_PASS),-passin pass:$(CA_KEY_PASS)) -sha256 -days 365 \
 	  -out ./certs/$(CERT_NAME)CA.pem \
 	  -subj "/C=US/ST=Virginia/L=Fredericksburg/O=Camunda/OU=IT Department/CN=$(CERT_NAME) CA" \
 
@@ -70,7 +71,7 @@ delete-server-csr:
 .PHONY: create-server-cert
 create-server-cert: create-certs-dir delete-server-cert create-san-ext
 	openssl x509 -req -in ./certs/$(CERT_NAME)Server.csr -CA ./certs/$(CERT_NAME)CA.pem \
-	  -CAkey ./certs/$(CERT_NAME)CA.key -CAcreateserial -out ./certs/$(CERT_NAME)Server.crt \
+	  -CAkey ./certs/$(CERT_NAME)CA.key $(if $(CA_KEY_PASS),-passin pass:$(CA_KEY_PASS)) -CAcreateserial -out ./certs/$(CERT_NAME)Server.crt \
 	  -days 365 -sha256 -extfile ./certs/san.ext
 
 .PHONY: delete-server-cert

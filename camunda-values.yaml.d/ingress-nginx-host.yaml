@@ -1,0 +1,23 @@
+# Chart 15 (Camunda 8.10+) ingress-nginx with TLS. The hostname moved from global.ingress.host
+# (removed in chart 15) to global.host. Supersedes enable-ingress-nginx.yaml for chart 15.
+global:
+  host: "<YOUR_HOSTNAME>"
+  ingress:
+    enabled: true
+    className: nginx
+    tls:
+      enabled: true
+      secretName: "tls-secret"
+
+orchestration:
+  gateway:
+    grpc:
+      enabled: true
+  ingress:
+    grpc:
+      enabled: true
+      host: "grpc.<YOUR_HOSTNAME>"
+      path: "/"
+      tls:
+        enabled: true
+        secretName: "grpc-tls-secret"

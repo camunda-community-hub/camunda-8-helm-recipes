@@ -1,0 +1,195 @@
+# Chart 15 (Camunda 8.10+) ingress-nginx with TLS. The hostname moved from global.ingress.host
+# (removed in chart 15) to global.host. Supersedes enable-ingress-nginx.yaml for chart 15.
+# Chart 15 (Camunda 8.10+): OIDC against an EXTERNAL Keycloak, plus Identity on external PostgreSQL.
+# Chart 15 no longer bundles Keycloak (no identityKeycloak / identityPostgresql), so run your own.
+# Identity connects to Keycloak's admin API on first boot and creates the camunda-platform realm.
+# Supersedes oidc.yaml + identity-keycloak-*.yaml, which target chart 14.
+global:
+  host: "camunda.local"
+  ingress:
+    enabled: true
+    className: nginx
+    tls:
+      enabled: true
+      secretName: "tls-secret"
+  extraManifests:
+    - apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: camunda-identity-host
+        annotations:
+          nginx.ingress.kubernetes.io/proxy-buffer-size: 128k
+      spec:
+        ingressClassName: nginx
+        tls:
+          - hosts: [identity.camunda.local]
+            secretName: tls-secret
+        rules:
+          - host: identity.camunda.local
+            http:
+              paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: camunda-identity
+                      port:
+                        number: 80
+    # Hub builds its "Management Identity" link as <global.host><identity.contextPath> and ignores
+    # identity.fullURL, so the link is https://camunda.local/ . Redirect that bare root to Identity.
+    - apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: camunda-root-to-identity
+        annotations:
+          nginx.ingress.kubernetes.io/permanent-redirect: https://identity.camunda.local
+          nginx.ingress.kubernetes.io/permanent-redirect-code: "302"
+      spec:
+        ingressClassName: nginx
+        tls:
+          - hosts: [camunda.local]
+            secretName: tls-secret
+        rules:
+          - host: camunda.local
+            http:
+              paths:
+                - path: /
+                  pathType: Exact
+                  backend:
+                    service:
+                      name: camunda-identity
+                      port:
+                        number: 80
+  security:
+    authentication:
+      method: oidc
+  identity:
+    auth:
+      enabled: true
+      publicIssuerUrl: https://camunda.local/auth/realms/camunda-platform
+      issuerBackendUrl: http://camunda-keycloak/auth/realms/camunda-platform
+      authUrl: https://camunda.local/auth/realms/camunda-platform/protocol/openid-connect/auth
+      tokenUrl: http://camunda-keycloak/auth/realms/camunda-platform/protocol/openid-connect/token
+      jwksUrl: http://camunda-keycloak/auth/realms/camunda-platform/protocol/openid-connect/certs
+      identity:
+        redirectUrl: https://identity.camunda.local
+      webModeler:
+        redirectUrl: https://camunda.local/modeler
+      camundaHub:
+        redirectUrl: https://camunda.local/modeler
+      # Identity still requires this even though Optimize is disabled
+      optimize:
+        secret:
+          existingSecret: camunda-credentials
+          existingSecretKey: identity-optimize-client-token
+    keycloak:
+      url:
+        protocol: http
+        host: camunda-keycloak
+        port: 80
+      contextPath: /auth
+      realm: /realms/camunda-platform
+      auth:
+        adminUser: admin
+        secret:
+          existingSecret: camunda-credentials
+          existingSecretKey: identity-keycloak-admin-password
+# Minimal topology for feature testing, not load.
+orchestration:
+  gateway:
+    grpc:
+      enabled: true
+  ingress:
+    grpc:
+      enabled: true
+      host: "grpc.camunda.local"
+      path: "/"
+      tls:
+        enabled: true
+        secretName: "grpc-tls-secret"
+  contextPath: /orchestration
+  security:
+    authentication:
+      method: oidc
+      oidc:
+        redirectUrl: https://camunda.local/orchestration
+        secret:
+          existingSecret: camunda-credentials
+          existingSecretKey: identity-orchestration-client-token
+  enabled: true
+  exporters:
+    camunda:
+      enabled: false
+    rdbms:
+      enabled: true
+  data:
+    secondaryStorage:
+      type: rdbms
+      rdbms:
+        url: jdbc:postgresql://postgres:5432/camunda
+        username: camunda
+        secret:
+          existingSecret: camunda-credentials
+          existingSecretKey: orchestration-rdbms-password
+  clusterSize: "1"
+  partitionCount: "1"
+  replicationFactor: "1"
+  pvcSize: 5Gi
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+identity:
+  enabled: true
+  # No contextPath: the Management Identity UI (8.10 alpha5) breaks under a sub-path.
+  # Serve it on its own hostname, see identity-own-hostname.yaml.
+  fullURL: https://identity.camunda.local
+  firstUser:
+    secret:
+      existingSecret: camunda-credentials
+      existingSecretKey: identity-first-user-password
+  env:
+    - name: KEYCLOAK_REALM
+      value: camunda-platform
+  externalDatabase:
+    enabled: true
+    host: postgres
+    port: 5432
+    database: identity
+    schema: public
+    username: identity
+    secret:
+      existingSecret: camunda-credentials
+      existingSecretKey: identity-postgresql-user-password
+connectors:
+  security:
+    authentication:
+      method: oidc
+      oidc:
+        secret:
+          existingSecret: camunda-credentials
+          existingSecretKey: identity-connectors-client-token
+  enabled: true
+# Camunda Hub (8.10+): replaces Web Modeler and Console.
+# Requires a PostgreSQL database; point externalDatabase at it.
+# Pair with oidc-external-keycloak.yaml (chart 15). Hub's pods are still named web-modeler-*.
+camundaHub:
+  enabled: true
+  contextPath: /modeler
+  restapi:
+    mail:
+      # Required, otherwise the restapi pod does not start.
+      fromAddress: noreply@example.com
+    externalDatabase:
+      host: "postgres"
+      port: 5432
+      database: "modeler"
+      username: "modeler"
+      secret:
+        existingSecret: "camunda-credentials"
+        existingSecretKey: "webmodeler-postgresql-user-password"
+optimize:
+  enabled: false

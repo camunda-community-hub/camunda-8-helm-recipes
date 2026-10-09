@@ -1,0 +1,18 @@
+# Camunda Hub (8.10+): replaces Web Modeler and Console.
+# Requires a PostgreSQL database; point externalDatabase at it.
+# Pair with oidc-external-keycloak.yaml (chart 15). Hub's pods are still named web-modeler-*.
+camundaHub:
+  enabled: true
+  contextPath: /modeler
+  restapi:
+    mail:
+      # Required, otherwise the restapi pod does not start.
+      fromAddress: noreply@example.com
+    externalDatabase:
+      host: "<POSTGRES_MODELER_HOST>"
+      port: 5432
+      database: "<POSTGRES_MODELER_DB>"
+      username: "<POSTGRES_MODELER_USERNAME>"
+      secret:
+        existingSecret: "camunda-credentials"
+        existingSecretKey: "webmodeler-postgresql-user-password"

@@ -1,0 +1,97 @@
+# Single Keycloak for local development only. Not for production.
+# Chart 15 no longer bundles Keycloak, so Identity connects to this one as an external Keycloak.
+# Public URL: https://<HOST_NAME>/auth. In cluster: http://camunda-keycloak/auth.
+# Uses the in-cluster postgres service (see postgres.tpl.yaml).
+apiVersion: v1
+kind: Service
+metadata:
+  name: camunda-keycloak
+spec:
+  selector:
+    app: camunda-keycloak
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: camunda-keycloak
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: camunda-keycloak
+  template:
+    metadata:
+      labels:
+        app: camunda-keycloak
+    spec:
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:26.3
+          args: ["start"]
+          env:
+            - name: KC_DB
+              value: postgres
+            - name: KC_DB_URL
+              value: jdbc:postgresql://postgres:5432/<POSTGRES_KEYCLOAK_DB>
+            - name: KC_DB_USERNAME
+              value: <POSTGRES_KEYCLOAK_USERNAME>
+            - name: KC_DB_PASSWORD
+              value: <DEFAULT_PASSWORD>
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              value: <KEYCLOAK_ADMIN_USERNAME>
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              value: <DEFAULT_PASSWORD>
+            - name: KC_HTTP_ENABLED
+              value: "true"
+            - name: KC_HTTP_RELATIVE_PATH
+              value: /auth
+            - name: KC_HOSTNAME
+              value: https://<HOST_NAME>/auth
+            - name: KC_HOSTNAME_BACKCHANNEL_DYNAMIC
+              value: "true"
+            - name: KC_PROXY_HEADERS
+              value: xforwarded
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+          ports:
+            - containerPort: 8080
+            - containerPort: 9000
+          readinessProbe:
+            httpGet:
+              path: /auth/health/ready
+              port: 9000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 18
+          resources:
+            requests:
+              cpu: 250m
+              memory: 768Mi
+            limits:
+              memory: 1Gi
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: camunda-keycloak
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-buffer-size: 128k
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [<HOST_NAME>]
+      secretName: <TLS_SECRET_NAME>
+  rules:
+    - host: <HOST_NAME>
+      http:
+        paths:
+          - path: /auth
+            pathType: Prefix
+            backend:
+              service:
+                name: camunda-keycloak
+                port:
+                  number: 80

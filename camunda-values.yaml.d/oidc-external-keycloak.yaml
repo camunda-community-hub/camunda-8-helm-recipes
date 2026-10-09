@@ -1,0 +1,82 @@
+# Chart 15 (Camunda 8.10+): OIDC against an EXTERNAL Keycloak, plus Identity on external PostgreSQL.
+# Chart 15 no longer bundles Keycloak (no identityKeycloak / identityPostgresql), so run your own.
+# Identity connects to Keycloak's admin API on first boot and creates the <KEYCLOAK_REALM> realm.
+# Supersedes oidc.yaml + identity-keycloak-*.yaml, which target chart 14.
+global:
+  security:
+    authentication:
+      method: oidc
+  identity:
+    auth:
+      enabled: true
+      publicIssuerUrl: <KEYCLOAK_EXT_URL>/auth/realms/<KEYCLOAK_REALM>
+      issuerBackendUrl: http://camunda-keycloak/auth/realms/<KEYCLOAK_REALM>
+      authUrl: <KEYCLOAK_EXT_URL>/auth/realms/<KEYCLOAK_REALM>/protocol/openid-connect/auth
+      tokenUrl: http://camunda-keycloak/auth/realms/<KEYCLOAK_REALM>/protocol/openid-connect/token
+      jwksUrl: http://camunda-keycloak/auth/realms/<KEYCLOAK_REALM>/protocol/openid-connect/certs
+      identity:
+        redirectUrl: <IDENTITY_EXT_URL>
+      webModeler:
+        redirectUrl: <WEB_MODELER_EXT_URL>/modeler
+      camundaHub:
+        redirectUrl: <WEB_MODELER_EXT_URL>/modeler
+      # Identity still requires this even though Optimize is disabled
+      optimize:
+        secret:
+          existingSecret: camunda-credentials
+          existingSecretKey: identity-optimize-client-token
+    keycloak:
+      url:
+        protocol: http
+        host: camunda-keycloak
+        port: 80
+      contextPath: /auth
+      realm: /realms/<KEYCLOAK_REALM>
+      auth:
+        adminUser: <KEYCLOAK_ADMIN_USERNAME>
+        secret:
+          existingSecret: camunda-credentials
+          existingSecretKey: identity-keycloak-admin-password
+
+identity:
+  enabled: true
+  # No contextPath: the Management Identity UI (8.10 alpha5) breaks under a sub-path.
+  # Serve it on its own hostname, see identity-own-hostname.yaml.
+  fullURL: <IDENTITY_EXT_URL>
+  firstUser:
+    secret:
+      existingSecret: camunda-credentials
+      existingSecretKey: identity-first-user-password
+  env:
+    - name: KEYCLOAK_REALM
+      value: <KEYCLOAK_REALM>
+  externalDatabase:
+    enabled: true
+    host: <POSTGRES_HOST>
+    port: 5432
+    database: <POSTGRES_IDENTITY_DB>
+    schema: public
+    username: <POSTGRES_IDENTITY_USERNAME>
+    secret:
+      existingSecret: camunda-credentials
+      existingSecretKey: identity-postgresql-user-password
+
+orchestration:
+  contextPath: /orchestration
+  security:
+    authentication:
+      method: oidc
+      oidc:
+        redirectUrl: <ORCHESTRATION_EXT_URL>/orchestration
+        secret:
+          existingSecret: camunda-credentials
+          existingSecretKey: identity-orchestration-client-token
+
+connectors:
+  security:
+    authentication:
+      method: oidc
+      oidc:
+        secret:
+          existingSecret: camunda-credentials
+          existingSecretKey: identity-connectors-client-token

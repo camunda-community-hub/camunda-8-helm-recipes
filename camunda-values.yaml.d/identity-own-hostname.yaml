@@ -1,0 +1,53 @@
+# Management Identity on its own hostname (identity.<YOUR_HOSTNAME>) instead of a sub-path.
+# Chart 15 has no identity.ingress, and the Identity UI (8.10 alpha5) requests assets and /api from
+# the site root and scopes its cookies to the sub-path, so it breaks under /management.
+# Delivered with the release through global.extraManifests. Requires the TLS cert to cover this host.
+global:
+  extraManifests:
+    - apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: camunda-identity-host
+        annotations:
+          nginx.ingress.kubernetes.io/proxy-buffer-size: 128k
+      spec:
+        ingressClassName: nginx
+        tls:
+          - hosts: [identity.<YOUR_HOSTNAME>]
+            secretName: tls-secret
+        rules:
+          - host: identity.<YOUR_HOSTNAME>
+            http:
+              paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: camunda-identity
+                      port:
+                        number: 80
+    # Hub builds its "Management Identity" link as <global.host><identity.contextPath> and ignores
+    # identity.fullURL, so the link is https://<YOUR_HOSTNAME>/ . Redirect that bare root to Identity.
+    - apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: camunda-root-to-identity
+        annotations:
+          nginx.ingress.kubernetes.io/permanent-redirect: <IDENTITY_EXT_URL>
+          nginx.ingress.kubernetes.io/permanent-redirect-code: "302"
+      spec:
+        ingressClassName: nginx
+        tls:
+          - hosts: [<YOUR_HOSTNAME>]
+            secretName: tls-secret
+        rules:
+          - host: <YOUR_HOSTNAME>
+            http:
+              paths:
+                - path: /
+                  pathType: Exact
+                  backend:
+                    service:
+                      name: camunda-identity
+                      port:
+                        number: 80

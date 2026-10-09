@@ -15,3 +15,4 @@ DNS.8 = RELEASE-zeebe-gateway.NAMESPACE.svc.cluster.local
 DNS.9 = RELEASE-zeebe-0.RELEASE-zeebe.NAMESPACE.svc.cluster.local
 DNS.10 = RELEASE-zeebe-1.RELEASE-zeebe.NAMESPACE.svc.cluster.local
 DNS.11 = RELEASE-zeebe-2.RELEASE-zeebe.NAMESPACE.svc.cluster.local
+DNS.12 = identity.HOST_NAME

@@ -3,7 +3,8 @@ CAMUNDA_RECIPES := \
   oidc-ingress-nginx-tls \
   oidc-gateway-traefik-tls \
   rdbms-postgres \
-  rdbms-postgres-oidc
+  rdbms-postgres-oidc \
+  ../kind/hub
 
 .PHONY: test
 test:

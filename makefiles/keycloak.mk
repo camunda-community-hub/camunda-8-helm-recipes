@@ -22,3 +22,17 @@ keycloak-password:
 	@echo KeyCloak Admin password: $(kcPassword)
 
 
+
+# Identity cannot renew expired tokens against the public (self-signed) issuer URL from inside the
+# cluster, so Management Identity returns HTTP 500 about 5 minutes after login. For local development,
+# long token/session lifespans avoid renewal. Works with the Keycloak from `make kind-keycloak`.
+# The realm is created by Identity at startup, so this waits for it.
+.PHONY: keycloak-realm-tuning
+keycloak-realm-tuning:
+	@echo "waiting for realm $(KEYCLOAK_REALM) ..."
+	@for i in $$(seq 1 60); do \
+	  if kubectl exec -n $(CAMUNDA_NAMESPACE) deploy/camunda-keycloak -- sh -c \
+	    '/opt/keycloak/bin/kcadm.sh config credentials --server http://localhost:8080/auth --realm master --user $(KEYCLOAK_ADMIN_USERNAME) --password $(DEFAULT_PASSWORD) >/dev/null 2>&1 && \
+	     /opt/keycloak/bin/kcadm.sh update realms/$(KEYCLOAK_REALM) -s accessTokenLifespan=28800 -s ssoSessionIdleTimeout=28800 -s ssoSessionMaxLifespan=43200' >/dev/null 2>&1; then \
+	    echo "realm $(KEYCLOAK_REALM): token lifespan 8h, session 12h"; exit 0; fi; sleep 10; done; \
+	  echo "ERROR: realm $(KEYCLOAK_REALM) not available"; exit 1

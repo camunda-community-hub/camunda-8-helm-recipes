@@ -1,0 +1,82 @@
+# Single in-cluster PostgreSQL for local development only. Not for production.
+# Hosts the Camunda (RDBMS secondary storage), Hub, Identity and Keycloak databases.
+# Every role uses <DEFAULT_PASSWORD>, matching the camunda-credentials secret.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+data:
+  init.sql: |
+    CREATE USER <POSTGRES_CAMUNDA_USERNAME> WITH PASSWORD '<DEFAULT_PASSWORD>';
+    CREATE DATABASE <POSTGRES_CAMUNDA_DB> OWNER <POSTGRES_CAMUNDA_USERNAME>;
+    CREATE USER <POSTGRES_MODELER_USERNAME> WITH PASSWORD '<DEFAULT_PASSWORD>';
+    CREATE DATABASE <POSTGRES_MODELER_DB> OWNER <POSTGRES_MODELER_USERNAME>;
+    CREATE USER <POSTGRES_KEYCLOAK_USERNAME> WITH PASSWORD '<DEFAULT_PASSWORD>';
+    CREATE DATABASE <POSTGRES_KEYCLOAK_DB> OWNER <POSTGRES_KEYCLOAK_USERNAME>;
+    CREATE USER <POSTGRES_IDENTITY_USERNAME> WITH PASSWORD '<DEFAULT_PASSWORD>';
+    CREATE DATABASE <POSTGRES_IDENTITY_DB> OWNER <POSTGRES_IDENTITY_USERNAME>;
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          env:
+            - name: POSTGRES_PASSWORD
+              value: <POSTGRES_MASTER_PASSWORD>
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+      volumes:
+        - name: init
+          configMap:
+            name: postgres-init
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 2Gi

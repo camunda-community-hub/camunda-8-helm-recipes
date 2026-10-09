@@ -29,6 +29,7 @@ camunda-8-helm-recipes/
 │   ├── ingress-nginx/           # Standalone nginx ingress setup
 │   ├── letsencrypt/             # cert-manager + Let's Encrypt issuers
 │   ├── kind/                    # Local Kind cluster
+│   │   └── hub/                 # Camunda 8.10 + Hub on Kind (cluster, ingress, TLS, Postgres, Keycloak, Camunda)
 │   ├── aws/eks/                 # AWS EKS cluster
 │   ├── aws/eks-and-aurora-postgres/
 │   ├── aws/eks-dual-region/     # Dual-region EKS with VPC peering + CoreDNS chaining
@@ -88,6 +89,7 @@ Each recipe under `recipes/camunda/` contains:
 | `oidc-gateway-traefik-tls` | enable-opensearch, metrics, oidc, identity-keycloak-external-postgres, modeler-enabled, modeler-external-postgres, orchestration-opensearch, optimize-opensearch, console-enabled, my-camunda-values | Traefik IngressRoute CRDs; OpenSearch; external Postgres for Keycloak, Modeler, Identity |
 | `oidc-gateway-traefik-tls-es` | enable-elasticsearch, metrics, oidc, identity-keycloak-internal-postgres, modeler-enabled, modeler-internal-postgres, orchestration-elasticsearch, orchestration-oidc, enable-multitenancy, my-camunda-values | Traefik IngressRoute CRDs; Elasticsearch; internal Postgres |
 | `rdbms-postgres` | orchestration-rdbms-postgres, my-camunda-values | External Aurora/Postgres backend; no ingress |
+| `kind/hub` (in `recipes/kind/`) | ingress-nginx-host, identity-own-hostname, oidc-external-keycloak, connectors-enabled, orchestration-rdbms-postgres, hub-enabled, my-camunda-values | **Chart 15 / Camunda 8.10 alpha.** Local only: Camunda Hub, own Keycloak and PostgreSQL deployed in-cluster, Identity on its own hostname, minimal 1-broker Zeebe |
 | `rdbms-postgres-oidc` | enable-ingress-nginx, identity-keycloak-external-postgres, connectors-oidc, orchestration-rdbms-postgres, orchestration-oidc, my-camunda-values | External Postgres + Keycloak OIDC for Orchestration and Connectors; ingress nginx (HTTP, no TLS) |
 
 ---
@@ -140,6 +142,10 @@ Each recipe under `recipes/camunda/` contains:
 | `modeler-internal-postgres.yaml` | Web Modeler uses bundled Postgres |
 | `modeler-external-postgres.yaml` | Web Modeler uses external Postgres (`<POSTGRES_MODELER_HOST>`) |
 | `enable-identity-postgres.yaml` | Internal Postgres for Identity |
+| `hub-enabled.yaml` | **Chart 15 only.** `camundaHub.enabled` with its external PostgreSQL database (`<POSTGRES_MODELER_*>`); replaces Web Modeler + Console |
+| `oidc-external-keycloak.yaml` | **Chart 15 only.** OIDC against an external Keycloak, Identity on external Postgres, orchestration and Connectors OIDC; replaces `oidc.yaml` + `identity-keycloak-*.yaml` |
+| `ingress-nginx-host.yaml` | **Chart 15 only.** nginx ingress with TLS using `global.host` (`global.ingress.host` was removed); replaces `enable-ingress-nginx.yaml` |
+| `identity-own-hostname.yaml` | **Chart 15 only.** Management Identity on `identity.<YOUR_HOSTNAME>` plus a redirect for Hub's Identity link, via `global.extraManifests` |
 | `custom-registry.yaml` | Override container image registry |
 | `modeler-debug.yaml` | DEBUG logging for Web Modeler |
 

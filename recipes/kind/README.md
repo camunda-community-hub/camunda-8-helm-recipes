@@ -26,3 +26,5 @@ make kube
 This will create a new `kind` cluster in Docker Desktop
 
 Then use other recipes, such as the [Simple Orchestration recipe](../camunda/orchestration-simple), to install Camunda into kind
+
+To install Camunda 8.10 with Camunda Hub (Identity, Keycloak, PostgreSQL, ingress and TLS) on Kind in one step, see the [Hub recipe](hub/README.md).
