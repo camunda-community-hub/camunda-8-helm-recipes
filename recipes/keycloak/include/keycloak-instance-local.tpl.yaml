@@ -9,6 +9,10 @@ metadata:
 spec:
   image: docker.io/camunda/keycloak:quay-optimized-<KEYCLOAK_VERSION>
   instances: 1
+  bootstrapAdmin:
+    user:
+      # Created by `make keycloak-admin-secret` from DEFAULT_PASSWORD
+      secret: keycloak-initial-admin
   db:
     url: jdbc:aws-wrapper:postgresql://pg-keycloak-rw:5432/<POSTGRES_KEYCLOAK_DB>
     schema: public

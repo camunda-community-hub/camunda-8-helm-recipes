@@ -17,10 +17,19 @@ keycloak-operator:
 	kubectl apply -n $(CAMUNDA_NAMESPACE) --server-side -f $(KEYCLOAK_K8S_RESOURCES_URL)/kubernetes.yml
 	kubectl wait --for=condition=available --timeout=300s deployment/keycloak-operator -n $(CAMUNDA_NAMESPACE)
 
+# Bootstrap admin from KEYCLOAK_ADMIN_USERNAME and DEFAULT_PASSWORD instead of an operator generated password.
+# The Keycloak resource points at this secret with spec.bootstrapAdmin.user.secret.
+.PHONY: keycloak-admin-secret
+keycloak-admin-secret:
+	kubectl create namespace $(CAMUNDA_NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
+	kubectl create secret generic keycloak-initial-admin -n $(CAMUNDA_NAMESPACE) \
+	  --from-literal=username=$(KEYCLOAK_ADMIN_USERNAME) --from-literal=password='$(DEFAULT_PASSWORD)' \
+	  --dry-run=client -o yaml | kubectl apply -f -
+
 # KEYCLOAK_MODE: domain (public URL https://KEYCLOAK_HOST/auth) or local (no domain, port-forward)
 # KEYCLOAK_INGRESS: nginx (create an Ingress for /auth) or none (for example Traefik routes it elsewhere)
 .PHONY: keycloak
-keycloak: keycloak-operator
+keycloak: keycloak-operator keycloak-admin-secret
 	sed "s|<KEYCLOAK_VERSION>|$(KEYCLOAK_VERSION)|g; \
 	     s|<KEYCLOAK_HOST>|$(KEYCLOAK_HOST)|g; \
 	     s|<KEYCLOAK_CPU_REQUEST>|$(KEYCLOAK_CPU_REQUEST)|g; \

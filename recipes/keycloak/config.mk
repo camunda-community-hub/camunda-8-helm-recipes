@@ -32,3 +32,8 @@ POSTGRES_KEYCLOAK_DB ?= keycloak
 
 # Used by `make keycloak-realm-tuning`
 KEYCLOAK_REALM ?= camunda-platform
+
+# Bootstrap admin user. The password is DEFAULT_PASSWORD (set it in the root config.mk).
+# Keycloak only reads it when it first starts on an empty database.
+KEYCLOAK_ADMIN_USERNAME ?= temp-admin
+DEFAULT_PASSWORD ?= changeme

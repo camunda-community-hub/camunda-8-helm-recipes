@@ -4,7 +4,7 @@
 # Needs the pg-keycloak PostgreSQL cluster (recipes/postgres).
 #
 # The operator creates the service `keycloak-service` and the secret `keycloak-initial-admin`
-# (the admin user, default temp-admin).
+# (the bootstrap admin, from DEFAULT_PASSWORD).
 apiVersion: k8s.keycloak.org/v2alpha1
 kind: Keycloak
 metadata:
@@ -13,6 +13,10 @@ spec:
   # Camunda-maintained image with the Camunda Identity login theme, the /auth base path and the AWS JDBC wrapper
   image: docker.io/camunda/keycloak:quay-optimized-<KEYCLOAK_VERSION>
   instances: 1
+  bootstrapAdmin:
+    user:
+      # Created by `make keycloak-admin-secret` from DEFAULT_PASSWORD
+      secret: keycloak-initial-admin
   db:
     # pg-keycloak-rw is the service of the CloudNativePG keycloak cluster.
     # aws-wrapper is required for the optimized image (no impact on functionality).

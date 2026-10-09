@@ -1,5 +1,5 @@
 # Keycloak admin helpers for the operator-managed Keycloak (see recipes/keycloak).
-# The operator creates the secret keycloak-initial-admin (default user temp-admin).
+# The secret keycloak-initial-admin is created by `make keycloak-admin-secret` (user KEYCLOAK_ADMIN_USERNAME, password DEFAULT_PASSWORD).
 
 .PHONY: keycloak-password
 keycloak-password:
