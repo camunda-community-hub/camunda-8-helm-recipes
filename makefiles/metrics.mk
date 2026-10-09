@@ -26,10 +26,11 @@ update-metrics:
 clean-metrics:
 	-kubectl delete -f $(root)/recipes/metrics/grafana-load-balancer.yml -n default
 	-helm uninstall metrics --namespace default
-	-kubectl delete -f $(root)/recipes/metrics/grafana-secret.yml -n default
+	-kubectl delete secret grafana-credentials metrics-kube-prometheus-st-admission -n default
 #	-kubectl delete -f $(include-dir)/ssd-storageclass.yaml -n default
 	-kubectl delete pvc -l app.kubernetes.io/name=prometheus -n default
 	-kubectl delete pvc -l app.kubernetes.io/name=grafana -n default
+	-kubectl get crd -o name | grep 'monitoring.coreos.com' | xargs kubectl delete
 
 .PHONY: port-grafana
 port-grafana:

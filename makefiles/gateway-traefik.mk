@@ -20,6 +20,7 @@ gateway-traefik:
 clean-gateway-traefik:
 	-helm --namespace $(TRAEFIK_NAMESPACE) uninstall $(TRAEFIK_RELEASE_NAME)
 	-kubectl delete namespace $(TRAEFIK_NAMESPACE)
+	-kubectl get crd -o name | grep 'traefik' | xargs kubectl delete
 
 .PHONY: traefik-ip-from-service
 traefik-ip-from-service:

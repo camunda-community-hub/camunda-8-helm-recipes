@@ -65,6 +65,7 @@ postgres-password:
 clean-postgres:
 	@for c in $(PG_CLUSTERS); do \
 	  kubectl delete cluster.postgresql.cnpg.io $$c -n $(CAMUNDA_NAMESPACE); \
+	  kubectl delete pvc -l cnpg.io/cluster=$$c -n $(CAMUNDA_NAMESPACE); \
 	  kubectl delete secret $$c-secret $$c-superuser-secret -n $(CAMUNDA_NAMESPACE); \
 	done; true
 
