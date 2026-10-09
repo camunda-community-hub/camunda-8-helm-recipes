@@ -1,6 +1,7 @@
 # https://cert-manager.io/docs/tutorials/acme/nginx-ingress/
 LETSENCRYPT_PROD_URL ?= https:\\/\\/acme-v02.api.letsencrypt.org/directory
 INGRESS_CLASS ?= nginx
+CERT_MANAGER_VERSION ?= v1.21.2
 
 .PHONY: cert-manager
 cert-manager:
@@ -9,8 +10,8 @@ cert-manager:
 	helm install cert-manager jetstack/cert-manager \
 	--namespace cert-manager \
   	--create-namespace \
-  	--version v1.9.1 \
-	--set installCRDs=true
+  	--version $(CERT_MANAGER_VERSION) \
+	--set crds.enabled=true
 
 .PHONY: letsencrypt-staging
 letsencrypt-staging:
@@ -61,8 +62,10 @@ annotate-letsencrypt-stage: annotate-remove-ingress-tls
 # clean cert-manager and cluster issuer
 .PHONY: clean-cert-manager
 clean-cert-manager:
-	helm --namespace cert-manager delete cert-manager
-	kubectl delete namespace cert-manager
+	-kubectl delete clusterissuer --all
+	-helm --namespace cert-manager delete cert-manager
+	-kubectl delete namespace cert-manager
+	-kubectl get crd -o name | grep 'cert-manager.io' | xargs kubectl delete
 
 # create a secret containing a cacerts truststore containing the lets encrypt staging CA certificates
 .PHONY: cacerts-staging
