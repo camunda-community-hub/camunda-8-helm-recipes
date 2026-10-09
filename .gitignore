@@ -7,3 +7,4 @@
 **/ebs-csi-driver-trust-policy.json
 **/ingress-routes.yaml
 **/*.bk.yaml
+/recipes/benchmark/es-storage-results/

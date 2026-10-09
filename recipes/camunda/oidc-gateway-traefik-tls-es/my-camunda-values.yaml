@@ -2,9 +2,42 @@
 # This file only contains additional overrides.
 # Note that array values, e.g. `orchestration.env` can NOT be merged by Helm.
 
+orchestration:
+  security:
+    initialization:
+      # Grants the "connectors" role RESOURCE:CREATE so the benchmark tool (which
+      # authenticates as the "connectors" client) can deploy its BenchmarkProcess
+      # with benchmark.autoDeployProcess=true. Without this, deploys are rejected
+      # with FORBIDDEN and the benchmark starts zero process instances.
+      authorizations:
+        - ownerType: ROLE
+          ownerId: connectors
+          resourceType: RESOURCE
+          resourceId: "*"
+          permissions:
+            - CREATE
+            - READ
+  resources:
+    limits:
+      cpu: "3"
+      memory: 6Gi
+    requests:
+      cpu: "2"
+      memory: 6Gi
+
+elasticsearch:
+  master:
+    replicaCount: 3       # optional: change node count
+    heapSize: 4096m       # optional: tune JVM heap (keep < 50% of memory limit)
+    resources:
+      requests:
+        cpu: "7"
+        memory: 8Gi 
+      limits:
+        cpu: "7"
+        memory: 8Gi
+
 optimize:
+  enabled: true
   migration:
     enabled: false
-  env:
-    - name: ES_LOG_LEVEL
-      value: "trace"
