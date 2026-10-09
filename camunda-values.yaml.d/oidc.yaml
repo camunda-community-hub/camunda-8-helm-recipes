@@ -40,7 +40,7 @@ global:
         redirectUrl: <OPTIMIZE_EXT_URL>/optimize
 
       camundaHub:
-        redirectUrl: <WEB_MODELER_EXT_URL>/modeler
+        redirectUrl: <WEB_MODELER_EXT_URL>/hub
 
     keycloak:
       url:

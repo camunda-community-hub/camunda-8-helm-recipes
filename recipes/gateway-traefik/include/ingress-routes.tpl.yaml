@@ -137,7 +137,7 @@ spec:
           port: 8080
 
     # Camunda Hub (Web Modeler and Console) webapp
-    - match: Host(`<YOUR_HOSTNAME>`) && PathPrefix(`/modeler`)
+    - match: Host(`<YOUR_HOSTNAME>`) && PathPrefix(`/hub`)
       kind: Rule
       middlewares:
         - name: forward-https-headers
@@ -147,7 +147,7 @@ spec:
           port: 80
 
     # Camunda Hub WebSocket
-    - match: Host(`<YOUR_HOSTNAME>`) && PathPrefix(`/modeler-ws`)
+    - match: Host(`<YOUR_HOSTNAME>`) && PathPrefix(`/hub-ws`)
       kind: Rule
       middlewares:
         - name: forward-https-headers

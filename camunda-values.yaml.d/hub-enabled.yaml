@@ -3,7 +3,7 @@
 # Pair with oidc.yaml. Hub's pods and services are still named web-modeler-*.
 camundaHub:
   enabled: true
-  contextPath: /modeler
+  contextPath: /hub
   # WebSocket public reachability for the browser client.
   # The chart only fills these in from global.ingress when global.ingress.enabled=true.
   # Recipes that use Traefik IngressRoute CRDs (no chart-managed Ingress) need them set here.
@@ -11,9 +11,9 @@ camundaHub:
     publicHost: <YOUR_HOSTNAME>
     publicPort: 443
     env:
-      # The websocket server is mounted at /modeler-ws, so it accepts requests on that prefix instead of "/".
+      # The websocket server is mounted at /hub-ws, so it accepts requests on that prefix instead of "/".
       - name: PUSHER_APP_PATH
-        value: "/modeler-ws"
+        value: "/hub-ws"
   restapi:
     # Stable Pusher app key + secret from camunda-credentials so the values do not rotate on `helm upgrade`
     # (the chart otherwise regenerates them on every render). restapi and websockets use the same refs.
@@ -49,4 +49,4 @@ camundaHub:
       - name: CAMUNDA_HUB_PUSHER_CLIENT_FORCETLS
         value: "true"
       - name: CAMUNDA_HUB_PUSHER_CLIENT_PATH
-        value: "/modeler-ws"
+        value: "/hub-ws"

@@ -17,9 +17,9 @@ global:
       identity:
         redirectUrl: <IDENTITY_EXT_URL>
       webModeler:
-        redirectUrl: <WEB_MODELER_EXT_URL>/modeler
+        redirectUrl: <WEB_MODELER_EXT_URL>/hub
       camundaHub:
-        redirectUrl: <WEB_MODELER_EXT_URL>/modeler
+        redirectUrl: <WEB_MODELER_EXT_URL>/hub
       # Identity still requires this even though Optimize is disabled
       optimize:
         secret:

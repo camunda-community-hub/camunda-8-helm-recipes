@@ -44,7 +44,7 @@ make all
 
 Then open (accept the browser's self signed certificate warning):
 
-- Hub: https://camunda.local/modeler
+- Hub: https://camunda.local/hub
 - Orchestration (Operate, Tasklist): https://camunda.local/orchestration
 - Identity: https://identity.camunda.local
 - Keycloak admin: https://camunda.local/auth (`admin` / `demo`)

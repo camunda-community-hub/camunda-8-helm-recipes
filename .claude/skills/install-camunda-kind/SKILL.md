@@ -50,7 +50,7 @@ the kube context is `kind-<DEPLOYMENT_NAME>`), `ingress-nginx` (hostPort), `tls`
 
 ## 3. Verify (never rely on a single signal)
 - `kubectl get pods -n camunda`: every pod `1/1 Running`, 0 restarts.
-- Routes: `for u in https://camunda.local/modeler/ https://camunda.local/orchestration/ https://identity.camunda.local/ https://camunda.local/; do curl -sk -o /dev/null -w '%{http_code} -> %{redirect_url}\n' $u; done`
+- Routes: `for u in https://camunda.local/hub/ https://camunda.local/orchestration/ https://identity.camunda.local/ https://camunda.local/; do curl -sk -o /dev/null -w '%{http_code} -> %{redirect_url}\n' $u; done`
   Expect 302s to the Hub login, the Keycloak login, the Identity login, and `/` to the Identity host.
 - Connectors may log many `Connection refused` errors to `camunda-zeebe-gateway` during startup while Zeebe is not
   ready; that is normal if the last minute of logs is clean and the pod has 0 restarts.

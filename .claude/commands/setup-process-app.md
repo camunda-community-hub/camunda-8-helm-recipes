@@ -164,7 +164,7 @@ curl -s -o /dev/null -w "API status: HTTP %{http_code}\n" -X POST \
   -H "Authorization: Bearer ${WM_TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{"filter":{}}' \
-  "https://${HOST_NAME}/modeler/api/v1/projects/search"
+  "https://${HOST_NAME}/hub/api/v1/projects/search"
 ```
 
 `200` = proceed. `404` = the `:*` roles haven't propagated yet — wait 10s and retry Step 2.
@@ -178,7 +178,7 @@ PROJECTS=$(curl -s -X POST \
   -H "Authorization: Bearer ${WM_TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{"filter":{},"page":0,"size":50}' \
-  "https://${HOST_NAME}/modeler/api/v1/projects/search")
+  "https://${HOST_NAME}/hub/api/v1/projects/search")
 
 PROJECT_ID=$(echo "${PROJECTS}" | python3 -c "
 import json,sys
@@ -191,7 +191,7 @@ if [ -z "${PROJECT_ID}" ]; then
     -H "Authorization: Bearer ${WM_TOKEN}" \
     -H "Content-Type: application/json" \
     -d '{"name":"Demo"}' \
-    "https://${HOST_NAME}/modeler/api/v1/projects")
+    "https://${HOST_NAME}/hub/api/v1/projects")
   PROJECT_ID=$(echo "${RESP}" | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
   echo "Created project: ${PROJECT_ID}"
 else
@@ -215,7 +215,7 @@ EXISTING_FILES=$(curl -s -X POST \
   -H "Authorization: Bearer ${WM_TOKEN}" \
   -H "Content-Type: application/json" \
   -d "{\"filter\":{\"projectId\":\"${PROJECT_ID}\"},\"page\":0,\"size\":100}" \
-  "https://${HOST_NAME}/modeler/api/v1/files/search")
+  "https://${HOST_NAME}/hub/api/v1/files/search")
 
 # For each local file (repeat this block per file):
 FILE_PATH="<absolute-path-to-file>"
@@ -245,7 +245,7 @@ print(json.dumps({
     -H "Authorization: Bearer ${WM_TOKEN}" \
     -H "Content-Type: application/json" \
     -d "${PAYLOAD}" \
-    "https://${HOST_NAME}/modeler/api/v1/files")
+    "https://${HOST_NAME}/hub/api/v1/files")
   FILE_ID=$(echo "${RESP}" | python3 -c "import json,sys; print(json.load(sys.stdin).get('id','ERROR: '+str(json.load(open('/dev/stdin')))))" 2>/dev/null || echo "${RESP}")
   echo "Uploaded ${FILE_NAME}: ${FILE_ID}"
 else
@@ -267,7 +267,7 @@ Print:
 ✓ Project:  Demo            (${PROJECT_ID})
 ✓ Files uploaded: <count>
   <list each: name → id>
-  URL: https://${HOST_NAME}/modeler
+  URL: https://${HOST_NAME}/hub
 ```
 
 ---
@@ -359,13 +359,13 @@ LOGIN_RESP=$(curl -s -w "\nHTTP: %{http_code}" -X POST \
   -H "Authorization: Bearer ${AUTO_TOKEN}" \
   -H "Content-Type: application/json" \
   -d "{\"iamId\":\"${AUTO_SUB}\",\"name\":\"wm-automation\",\"email\":\"wm-automation@example.com\"}" \
-  "https://${HOST_NAME}/modeler/api/internal/login")
+  "https://${HOST_NAME}/hub/api/internal/login")
 echo "Login bootstrap: ${LOGIN_RESP}"
 
 # Verify internal API is now accessible
 SELF=$(curl -s -o /dev/null -w "%{http_code}" \
   -H "Authorization: Bearer ${AUTO_TOKEN}" \
-  "https://${HOST_NAME}/modeler/api/internal/self")
+  "https://${HOST_NAME}/hub/api/internal/self")
 echo "Internal API /self: HTTP ${SELF}"
 ```
 
@@ -399,7 +399,7 @@ COLLAB_HTTP=$(curl -s -o /dev/null -w "%{http_code}" -X PUT \
   -H "Authorization: Bearer ${WM_TOKEN}" \
   -H "Content-Type: application/json" \
   -d "{\"projectId\":\"${PROJECT_ID}\",\"email\":\"wm-automation@example.com\",\"role\":\"project_admin\"}" \
-  "https://${HOST_NAME}/modeler/api/v1/collaborators")
+  "https://${HOST_NAME}/hub/api/v1/collaborators")
 echo "Add wm-automation collaborator: HTTP ${COLLAB_HTTP}"
 
 # Add each human user collected in Step 0 as a collaborator.
@@ -419,7 +419,7 @@ for USERNAME in ${HUMAN_USERS}; do
     -H "Authorization: Bearer ${WM_TOKEN}" \
     -H "Content-Type: application/json" \
     -d "{\"projectId\":\"${PROJECT_ID}\",\"email\":\"${EMAIL}\",\"role\":\"project_admin\"}" \
-    "https://${HOST_NAME}/modeler/api/v1/collaborators")
+    "https://${HOST_NAME}/hub/api/v1/collaborators")
   echo "Add ${USERNAME} (${EMAIL}) as collaborator: HTTP ${HTTP}"
 done
 ```
@@ -471,7 +471,7 @@ PA_RESP=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST \
   -H "Authorization: Bearer ${AUTO_TOKEN}" \
   -H "Content-Type: application/json" \
   -d "@${SCRATCH}/payload_pa.json" \
-  "https://${HOST_NAME}/modeler/api/internal/process-applications")
+  "https://${HOST_NAME}/hub/api/internal/process-applications")
 
 PA_HTTP=$(echo "${PA_RESP}" | grep "HTTP_STATUS:" | cut -d: -f2)
 PA_BODY=$(echo "${PA_RESP}" | grep -v "HTTP_STATUS:")
@@ -510,7 +510,7 @@ GIT_HTTP=$(curl -s -o /dev/null -w "%{http_code}" -X PUT \
   -H "Authorization: Bearer ${AUTO_TOKEN}" \
   -H "Content-Type: application/json" \
   -d "@${SCRATCH}/payload_git.json" \
-  "https://${HOST_NAME}/modeler/api/internal/process-applications/${PA_ID}/settings")
+  "https://${HOST_NAME}/hub/api/internal/process-applications/${PA_ID}/settings")
 echo "Git sync config: HTTP ${GIT_HTTP}"
 ```
 
@@ -538,7 +538,7 @@ GIT_HTTP=$(curl -s -o /dev/null -w "%{http_code}" -X PUT \
   -H "Authorization: Bearer ${AUTO_TOKEN}" \
   -H "Content-Type: application/json" \
   -d "@${SCRATCH}/payload_git.json" \
-  "https://${HOST_NAME}/modeler/api/internal/process-applications/${PA_ID}/settings")
+  "https://${HOST_NAME}/hub/api/internal/process-applications/${PA_ID}/settings")
 echo "Git sync config: HTTP ${GIT_HTTP}"
 ```
 
@@ -549,7 +549,7 @@ This replaces the placeholder with the real files from git (at the configured `p
 ```bash
 PULL_RESP=$(curl -s -X POST \
   -H "Authorization: Bearer ${AUTO_TOKEN}" \
-  "https://${HOST_NAME}/modeler/api/internal/process-applications/${PA_ID}/pull")
+  "https://${HOST_NAME}/hub/api/internal/process-applications/${PA_ID}/pull")
 echo "Pull: ${PULL_RESP}"
 ```
 
@@ -566,7 +566,7 @@ Print final summary:
 ✓ Process Application: ${PA_NAME}               (${PA_ID})
 ✓ Git sync:            ${PROVIDER} → ${REPO_URL} @ ${BRANCH} / ${PATH}
 ✓ Pulled from Git:     complete
-  Open: https://${HOST_NAME}/modeler
+  Open: https://${HOST_NAME}/hub
 ```
 
 ---
@@ -577,7 +577,7 @@ Print final summary:
 
 Tell the user:
 
-> **Open Web Modeler:** `https://${HOST_NAME}/modeler`
+> **Open Web Modeler:** `https://${HOST_NAME}/hub`
 >
 > You will see the **Demo** project with a `payment-process.bpmn` file.
 >
@@ -649,7 +649,7 @@ This means WM detected local changes that differ from git. **Git wins** — the 
 
 In WM 8.9, the pull endpoint is `/pull` (not `/sync` — `/sync` returns 404 in this version). Verify you are calling:
 ```bash
-POST /modeler/api/internal/process-applications/${PA_ID}/pull
+POST /hub/api/internal/process-applications/${PA_ID}/pull
 ```
 If that also 404s, check pod logs:
 ```bash
