@@ -14,3 +14,6 @@ orchestration:
         secret:
           existingSecret: camunda-credentials
           existingSecretKey: orchestration-rdbms-password
+  clusterSize: "1"
+  partitionCount: "1"
+  replicationFactor: "1"

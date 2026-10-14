@@ -75,6 +75,9 @@ orchestration:
           existingSecret: "camunda-credentials"
           existingSecretKey: "identity-orchestration-client-token"
         redirectUrl: https://example.camunda.com/orchestration
+  clusterSize: "1"
+  partitionCount: "1"
+  replicationFactor: "1"
 # Identity configured to point to an external postgresql database
 identity:
   enabled: true

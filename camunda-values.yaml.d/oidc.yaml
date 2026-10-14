@@ -3,7 +3,7 @@
 # client secrets and redirect URLs, and the Identity to Keycloak admin connection.
 #
 # Keycloak is not bundled in chart 15. Run it with recipes/keycloak (Keycloak operator): the service is
-# keycloak-service:18080, served under /auth, and the operator creates the keycloak-initial-admin secret.
+# keycloak-service:18080, served under /auth, and recipes/keycloak creates the keycloak-bootstrap-admin secret.
 # Management Identity creates the <KEYCLOAK_REALM> realm, the OIDC clients and the first user at startup.
 #
 # Combine with identity-enabled.yaml.
@@ -52,7 +52,7 @@ global:
       auth:
         adminUser: <KEYCLOAK_ADMIN_USERNAME>
         secret:
-          existingSecret: keycloak-initial-admin
+          existingSecret: keycloak-bootstrap-admin
           existingSecretKey: password
 
 connectors:

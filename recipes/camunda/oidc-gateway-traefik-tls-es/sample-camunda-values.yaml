@@ -44,7 +44,7 @@ global:
       auth:
         adminUser: temp-admin
         secret:
-          existingSecret: keycloak-initial-admin
+          existingSecret: keycloak-bootstrap-admin
           existingSecretKey: password
   multitenancy:
     enabled: true
@@ -173,6 +173,17 @@ orchestration:
       enabled: true
     api:
       enabled: true
+  clusterSize: "1"
+  partitionCount: "1"
+  replicationFactor: "1"
+  # Centralized secret resolution (8.10): processes reference camunda.secrets.NAME. The chart mounts the
+  # Kubernetes Secret below read-only at /etc/camunda/secrets, one file per key. Create it with
+  # `make create-process-secrets`. Only one secret store is allowed per physical tenant.
+  secretStore:
+    file:
+      default:
+        secret:
+          existingSecret: camunda-process-secrets
   resources:
     limits:
       cpu: "3"

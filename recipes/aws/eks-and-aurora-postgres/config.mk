@@ -38,4 +38,4 @@ POSTGRES_CAMUNDA_USERNAME ?= camunda
 DEFAULT_PASSWORD ?= changeme
 
 # Route 53 hosted zone name for the domain used by HOST_NAME (override in root config.mk)
-HOSTED_ZONE_NAME ?= example.com
+AWS_DNS_ZONE ?= example.com

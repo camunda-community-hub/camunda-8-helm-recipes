@@ -16,6 +16,7 @@ CAMUNDA_HELM_VALUES ?= \
   $(root)/camunda-values.yaml.d/enable-metrics.yaml \
   $(root)/camunda-values.yaml.d/connectors-enabled.yaml \
   $(root)/camunda-values.yaml.d/orchestration-elasticsearch.yaml \
+  $(root)/camunda-values.yaml.d/orchestration-topology.yaml \
   ./my-camunda-values.yaml
 
 DEFAULT_PASSWORD ?= changeme

@@ -9,7 +9,7 @@ CAMUNDA_NAMESPACE ?= camunda
 CAMUNDA_RELEASE_NAME ?= camunda
 
 CAMUNDA_CHART ?= camunda/camunda-platform
-CAMUNDA_HELM_CHART_VERSION ?= 15.0.0
+CAMUNDA_HELM_CHART_VERSION ?= 15.1.0
 CAMUNDA_VERSION ?= 8.10.0
 
 # Prerequisites (chart 15 does not bundle them), each its own recipe:
@@ -25,6 +25,8 @@ CAMUNDA_HELM_VALUES ?= \
   $(root)/camunda-values.yaml.d/orchestration-oidc.yaml \
   $(root)/camunda-values.yaml.d/optimize-elasticsearch.yaml \
   $(root)/camunda-values.yaml.d/enable-multitenancy.yaml \
+  $(root)/camunda-values.yaml.d/orchestration-topology.yaml \
+  $(root)/camunda-values.yaml.d/orchestration-secret-store-file.yaml \
   ./my-camunda-values.yaml
 
 DEFAULT_PASSWORD ?= changeme

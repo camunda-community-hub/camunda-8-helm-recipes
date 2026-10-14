@@ -12,7 +12,7 @@ spec:
   bootstrapAdmin:
     user:
       # Created by `make keycloak-admin-secret` from DEFAULT_PASSWORD
-      secret: keycloak-initial-admin
+      secret: keycloak-bootstrap-admin
   db:
     url: jdbc:aws-wrapper:postgresql://pg-keycloak-rw:5432/<POSTGRES_KEYCLOAK_DB>
     schema: public

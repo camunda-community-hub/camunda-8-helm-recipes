@@ -10,7 +10,7 @@ Management Identity creates the realm, OIDC clients and first user in this Keycl
 ## What you get
 - The Keycloak operator and an instance named `keycloak` in `CAMUNDA_NAMESPACE` (default `camunda`)
 - Service `keycloak-service:18080`, served under `/auth`
-- Secret `keycloak-initial-admin` with the bootstrap admin (default `temp-admin`, password `DEFAULT_PASSWORD`), created by `make keycloak-admin-secret`
+- Secret `keycloak-bootstrap-admin` with the bootstrap admin (default `temp-admin`, password `DEFAULT_PASSWORD`), created by `make keycloak-admin-secret`
 - In `domain` mode, issuer URLs are `https://<KEYCLOAK_HOST>/auth/realms/<realm>`
 - With `KEYCLOAK_INGRESS=nginx` (the default), an Ingress routes `/auth` to Keycloak. Traefik recipes route `/auth`
   through their IngressRoute instead, so set `KEYCLOAK_INGRESS ?= none` for them.

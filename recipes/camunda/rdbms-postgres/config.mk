@@ -21,6 +21,7 @@ CAMUNDA_VERSION ?= 8.9.0
 
 CAMUNDA_HELM_VALUES ?= \
   $(root)/camunda-values.yaml.d/orchestration-rdbms-postgres.yaml \
+  $(root)/camunda-values.yaml.d/orchestration-topology.yaml \
   ./my-camunda-values.yaml
 
 DEFAULT_PASSWORD ?= changeme

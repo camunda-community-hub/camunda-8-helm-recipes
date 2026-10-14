@@ -33,6 +33,7 @@ CAMUNDA_HELM_VALUES ?= \
   $(root)/camunda-values.yaml.d/orchestration-opensearch.yaml \
   $(root)/camunda-values.yaml.d/optimize-opensearch.yaml \
   $(root)/camunda-values.yaml.d/console-enabled.yaml \
+  $(root)/camunda-values.yaml.d/orchestration-topology.yaml \
   ./my-camunda-values.yaml
 
 DEFAULT_PASSWORD ?= demo

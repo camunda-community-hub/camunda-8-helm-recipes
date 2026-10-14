@@ -22,7 +22,7 @@ keycloak-operator:
 .PHONY: keycloak-admin-secret
 keycloak-admin-secret:
 	kubectl create namespace $(CAMUNDA_NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
-	kubectl create secret generic keycloak-initial-admin -n $(CAMUNDA_NAMESPACE) \
+	kubectl create secret generic keycloak-bootstrap-admin -n $(CAMUNDA_NAMESPACE) \
 	  --from-literal=username=$(KEYCLOAK_ADMIN_USERNAME) --from-literal=password='$(DEFAULT_PASSWORD)' \
 	  --dry-run=client -o yaml | kubectl apply -f -
 

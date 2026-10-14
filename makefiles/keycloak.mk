@@ -1,10 +1,10 @@
 # Keycloak admin helpers for the operator-managed Keycloak (see recipes/keycloak).
-# The secret keycloak-initial-admin is created by `make keycloak-admin-secret` (user KEYCLOAK_ADMIN_USERNAME, password DEFAULT_PASSWORD).
+# The secret keycloak-bootstrap-admin is created by `make keycloak-admin-secret` (user KEYCLOAK_ADMIN_USERNAME, password DEFAULT_PASSWORD).
 
 .PHONY: keycloak-password
 keycloak-password:
-	@echo "Keycloak admin user: $$(kubectl get secret keycloak-initial-admin -n $(CAMUNDA_NAMESPACE) -o go-template='{{.data.username | base64decode}}')"
-	@echo "Keycloak admin password: $$(kubectl get secret keycloak-initial-admin -n $(CAMUNDA_NAMESPACE) -o go-template='{{.data.password | base64decode}}')"
+	@echo "Keycloak admin user: $$(kubectl get secret keycloak-bootstrap-admin -n $(CAMUNDA_NAMESPACE) -o go-template='{{.data.username | base64decode}}')"
+	@echo "Keycloak admin password: $$(kubectl get secret keycloak-bootstrap-admin -n $(CAMUNDA_NAMESPACE) -o go-template='{{.data.password | base64decode}}')"
 
 # Optional, for self-signed TLS only. Identity cannot renew expired tokens against a public issuer URL
 # with a self-signed certificate from inside the cluster, so Management Identity returns HTTP 500 about
@@ -15,8 +15,8 @@ keycloak-password:
 .PHONY: keycloak-realm-tuning
 keycloak-realm-tuning:
 	@echo "waiting for realm $(KEYCLOAK_REALM) ..."
-	@admin=$$(kubectl get secret keycloak-initial-admin -n $(CAMUNDA_NAMESPACE) -o go-template='{{.data.username | base64decode}}'); \
-	 pass=$$(kubectl get secret keycloak-initial-admin -n $(CAMUNDA_NAMESPACE) -o go-template='{{.data.password | base64decode}}'); \
+	@admin=$$(kubectl get secret keycloak-bootstrap-admin -n $(CAMUNDA_NAMESPACE) -o go-template='{{.data.username | base64decode}}'); \
+	 pass=$$(kubectl get secret keycloak-bootstrap-admin -n $(CAMUNDA_NAMESPACE) -o go-template='{{.data.password | base64decode}}'); \
 	 for i in $$(seq 1 60); do \
 	  if kubectl exec -n $(CAMUNDA_NAMESPACE) keycloak-0 -- sh -c \
 	    "/opt/keycloak/bin/kcadm.sh config credentials --server http://localhost:18080/auth --realm master --user $$admin --password $$pass >/dev/null 2>&1 && \

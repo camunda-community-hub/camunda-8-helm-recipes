@@ -1,0 +1,4 @@
+orchestration:
+  clusterSize: "<CAMUNDA_CLUSTER_SIZE>"
+  partitionCount: "<CAMUNDA_PARTITION_COUNT>"
+  replicationFactor: "<CAMUNDA_REPLICATION_FACTOR>"

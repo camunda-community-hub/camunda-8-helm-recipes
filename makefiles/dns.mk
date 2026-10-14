@@ -3,6 +3,7 @@
 # ---------------------------------------------------------------------------
 
 GCP_DNS_ZONE ?= aks
+AWS_DNS_ZONE ?= example.com
 DNS_TTL ?= 60
 
 # Traefik service defaults (used by GCP DNS targets to look up the LB IP)
@@ -45,7 +46,7 @@ delete-gcp-dns:
 
 # Upserts A records in Route 53 pointing HOST_NAME and grpc.HOST_NAME to the ELB/NLB IP of $(LB_SERVICE).
 # The hostname is resolved to a single IP with dig. LB IPs can change, so re-run if the records go stale.
-# Requires HOSTED_ZONE_NAME (e.g. aws.c8sm.com) and HOST_NAME to be set (override in root config.mk).
+# Requires AWS_DNS_ZONE (e.g. aws.c8sm.com) and HOST_NAME to be set (override in root config.mk).
 # Usage: make update-route53-dns
 .PHONY: update-route53-dns
 update-route53-dns:
@@ -60,14 +61,14 @@ update-route53-dns:
 	if [ -z "$$IP" ]; then \
 		echo "❌ Could not resolve $$ELB_HOSTNAME to an IP address."; exit 1; \
 	fi; \
-	echo "Looking up Route 53 hosted zone ID for $(HOSTED_ZONE_NAME)..."; \
+	echo "Looking up Route 53 hosted zone ID for $(AWS_DNS_ZONE)..."; \
 	ZONE_ID=$$(aws route53 list-hosted-zones-by-name \
-		--dns-name $(HOSTED_ZONE_NAME) \
+		--dns-name $(AWS_DNS_ZONE) \
 		--max-items 1 \
 		--query "HostedZones[0].Id" \
 		--output text | cut -d'/' -f3); \
 	if [ -z "$$ZONE_ID" ] || [ "$$ZONE_ID" = "None" ]; then \
-		echo "❌ Could not find hosted zone for $(HOSTED_ZONE_NAME)"; exit 1; \
+		echo "❌ Could not find hosted zone for $(AWS_DNS_ZONE)"; exit 1; \
 	fi; \
 	echo "Zone ID: $$ZONE_ID"; \
 	echo "Upserting Route 53 A records: $(HOST_NAME) and grpc.$(HOST_NAME) → $$IP"; \

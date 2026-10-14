@@ -17,6 +17,7 @@ CAMUNDA_HELM_VALUES ?= \
   $(root)/camunda-values.yaml.d/connectors-oidc.yaml \
   $(root)/camunda-values.yaml.d/orchestration-rdbms-postgres.yaml \
   $(root)/camunda-values.yaml.d/orchestration-oidc.yaml \
+  $(root)/camunda-values.yaml.d/orchestration-topology.yaml \
   ./my-camunda-values.yaml
 
 DEFAULT_PASSWORD ?= changeme

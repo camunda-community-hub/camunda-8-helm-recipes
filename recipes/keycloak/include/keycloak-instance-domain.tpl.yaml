@@ -3,8 +3,9 @@
 # Public URL: https://<KEYCLOAK_HOST>/auth. In the cluster: http://keycloak-service:18080/auth.
 # Needs the pg-keycloak PostgreSQL cluster (recipes/postgres).
 #
-# The operator creates the service `keycloak-service` and the secret `keycloak-initial-admin`
-# (the bootstrap admin, from DEFAULT_PASSWORD).
+# The operator creates the service `keycloak-service`. The bootstrap admin secret `keycloak-bootstrap-admin`
+# (from DEFAULT_PASSWORD) is created by `make keycloak-admin-secret`. It must not be named
+# keycloak-initial-admin: the operator owns that name and fails with "already exists" if the secret is pre-created.
 apiVersion: k8s.keycloak.org/v2alpha1
 kind: Keycloak
 metadata:
@@ -16,7 +17,7 @@ spec:
   bootstrapAdmin:
     user:
       # Created by `make keycloak-admin-secret` from DEFAULT_PASSWORD
-      secret: keycloak-initial-admin
+      secret: keycloak-bootstrap-admin
   db:
     # pg-keycloak-rw is the service of the CloudNativePG keycloak cluster.
     # aws-wrapper is required for the optimized image (no impact on functionality).
