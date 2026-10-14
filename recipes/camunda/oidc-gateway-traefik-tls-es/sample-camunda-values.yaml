@@ -178,7 +178,7 @@ orchestration:
   replicationFactor: "1"
   # Centralized secret resolution (8.10): processes reference camunda.secrets.NAME. The chart mounts the
   # Kubernetes Secret below read-only at /etc/camunda/secrets, one file per key. Create it with
-  # `make create-process-secrets`. Only one secret store is allowed per physical tenant.
+  # recipes/camunda/secret-manager/file-store. Only one secret store is allowed per physical tenant.
   secretStore:
     file:
       default:

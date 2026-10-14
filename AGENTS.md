@@ -24,7 +24,9 @@ camunda-8-helm-recipes/
 │   │   ├── oidc-gateway-traefik-tls/   # Traefik + OpenSearch + external Postgres + OIDC
 │   │   ├── oidc-gateway-traefik-tls-es/ # Traefik + Elasticsearch + internal Postgres + OIDC
 │   │   ├── rdbms-postgres/
-│   │   └── rdbms-postgres-oidc/
+│   │   ├── rdbms-postgres-oidc/
+│   │   └── secret-manager/
+│   │       └── file-store/          # Kubernetes Secret for the 8.10 file secret store (camunda.secrets.NAME)
 │   ├── gateway-traefik/         # Traefik gateway controller base recipe
 │   ├── ingress-nginx/           # Standalone nginx ingress setup
 │   ├── letsencrypt/             # cert-manager + Let's Encrypt issuers
@@ -98,7 +100,7 @@ Each recipe under `recipes/camunda/` contains:
 
 | File | Purpose | Key Targets |
 |------|---------|-------------|
-| `camunda.mk` | Camunda install/uninstall | `camunda`, `camunda-values.yaml`, `install-camunda`, `dry-run-camunda`, `create-camunda-credentials`, `update-camunda`, `clean-camunda`, `template`, `port-*`, `pods` |
+| `camunda.mk` | Camunda install/uninstall | `camunda`, `camunda-values.yaml`, `install-camunda`, `dry-run-camunda`, `create-camunda-credentials`, `create-process-secrets`, `delete-process-secrets`, `update-camunda`, `clean-camunda`, `template`, `port-*`, `pods` |
 | `test.mk` | Test framework | `test` — generates values, diffs vs. sample, cleans up |
 | `kind.mk` | Local Kind clusters | `kube-kind`, `clean-kube-kind`, `use-kube` |
 | `aws-eks.mk` | AWS EKS | `kube-aws`, `oidc-provider`, `install-ebs-csi-controller-addon`, `scale-down`, `scale-up`, `kube-upgrade`, `ingress-aws-ip-from-service`, `update-route53-dns`, `connect-eks` |
@@ -131,6 +133,8 @@ Each recipe under `recipes/camunda/` contains:
 | `orchestration-opensearch.yaml` | Zeebe secondary storage = OpenSearch |
 | `orchestration-rdbms-postgres.yaml` | Zeebe secondary storage via JDBC (external Postgres); disables Elasticsearch |
 | `orchestration-oidc.yaml` | OIDC auth for Zeebe/Orchestration |
+| `orchestration-topology.yaml` | `orchestration.clusterSize`, `partitionCount` and `replicationFactor` from `CAMUNDA_CLUSTER_SIZE`, `CAMUNDA_PARTITION_COUNT` and `CAMUNDA_REPLICATION_FACTOR`. Not for dual-region (it has its own). Without it the chart defaults (3/3/3) apply |
+| `orchestration-secret-store-file.yaml` | 8.10 centralized secret resolution (`camunda.secrets.NAME`) with a file store. The chart mounts the Kubernetes Secret `camunda-process-secrets` at `/etc/camunda/secrets`. Create it with `recipes/camunda/secret-manager/file-store`, which turns every `SECRET_<NAME>` variable set in a `config.mk` or on the make command line into a secret `<NAME>`. Only one secret store per physical tenant |
 | `optimize-opensearch.yaml` | Optimize connected to OpenSearch |
 | `console-enabled.yaml` | Console component with context path `/console` and component URL map |
 | `enable-ingress-nginx.yaml` | Global ingress class=nginx, TLS, HTTP + gRPC hosts with `<YOUR_HOSTNAME>` placeholder |
@@ -187,18 +191,20 @@ Commit the updated `sample-camunda-values.yaml`.
 
 ## Secrets & Credentials
 
-Passwords are **never stored in config files or git**. The `create-camunda-credentials` target (in `camunda.mk`) creates a Kubernetes secret named `camunda-credentials` with keys for all components. YAML values files reference this secret via `existingSecret` / `existingSecretKey`.
+Passwords are **never stored in committed files or git**. Real values go in the root `config.mk`, which is gitignored. The `create-camunda-credentials` target (in `camunda.mk`) creates a Kubernetes secret named `camunda-credentials` with keys for all components. YAML values files reference this secret via `existingSecret` / `existingSecretKey`.
 
 The `DEFAULT_PASSWORD` variable in recipe `config.mk` is used by `create-camunda-credentials`. Default is `changeme` — override in root `config.mk` for real deployments.
+
+Process secrets (8.10 `camunda.secrets.NAME`) are `SECRET_<NAME>` variables in the root `config.mk` or on the make command line, turned into the `camunda-process-secrets` Secret by `recipes/camunda/secret-manager/file-store`. Plain environment variables are ignored.
 
 ---
 
 ## Common Patterns & Gotchas
 
 - **Array merge limitation**: `yq` replaces arrays entirely. If multiple values files set the same array key (e.g., `zeebe.env`), only the last one wins. Consolidate array definitions into a single file or into `my-camunda-values.yaml`.
-- **Root `config.mk`**: Create a `config.mk` at repo root to override variables (e.g., `HOST_NAME`, `AWS_REGION`, `HOSTED_ZONE_NAME`) without touching committed files. This file is gitignored.
+- **Root `config.mk`**: Create a `config.mk` at repo root to override variables (e.g., `HOST_NAME`, `AWS_REGION`, `AWS_DNS_ZONE`) without touching committed files. This file is gitignored.
 - **`ingress-aws-ip-from-service`**: Resolves the ELB IP via `dig` on the hostname from the ingress-nginx service — does NOT use the AWS ENI API (which only works for Classic LBs, not NLBs).
-- **`update-route53-dns`**: Upserts A records for `HOST_NAME` and `grpc.HOST_NAME` in Route 53. Requires `HOSTED_ZONE_NAME` (the zone domain name, e.g. `aws.c8sm.com`) — the target looks up the zone ID automatically. Do not set `HOSTED_ZONE_ID`.
+- **`update-route53-dns`**: Upserts A records for `HOST_NAME` and `grpc.HOST_NAME` in Route 53. Requires `AWS_DNS_ZONE` (the zone domain name, e.g. `aws.c8sm.com`) — the target looks up the zone ID automatically. Do not set `HOSTED_ZONE_ID`.
 - **`-include` vs `include`**: Recipes use `-include $(root)/config.mk` (dash = don't fail if missing) for the user's root override, and `include ./config.mk` (no dash) for the recipe's own defaults.
 - **`camunda-values.yaml` is always deleted first**: The `camunda-values.yaml` target depends on `delete-camunda-values`, ensuring a clean regeneration every time.
 - **Cloud provider recipes are independent of Camunda recipes**: Provision your cluster with a cloud recipe first, then use a Camunda recipe to install.

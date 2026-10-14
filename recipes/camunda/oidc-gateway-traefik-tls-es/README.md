@@ -14,6 +14,7 @@ This recipe provides:
 - **Camunda Hub** — Web Modeler and Console in one component, on CloudNativePG PostgreSQL
 - **Elasticsearch** — run by the ECK operator
 - **Multi-tenancy** — enabled
+- **Secret store** — file-based centralized secret resolution (`camunda.secrets.NAME`), see [`recipes/camunda/secret-manager/file-store`](../secret-manager/file-store)
 
 ## Prerequisites
 
@@ -23,6 +24,7 @@ Chart 15 does not bundle Elasticsearch, Keycloak or PostgreSQL. Install them fir
 make -C ../../elasticsearch   # ECK operator + Elasticsearch
 make -C ../../postgres        # CloudNativePG operator + pg-identity, pg-keycloak, pg-hub
 make -C ../../keycloak        # Keycloak operator + Keycloak (set KEYCLOAK_INGRESS ?= none, Traefik routes /auth)
+make -C ../secret-manager/file-store   # Kubernetes Secret behind the 8.10 file secret store (camunda.secrets.NAME)
 ```
 
 Also needed:
@@ -47,6 +49,8 @@ The `camunda-values.yaml` is composed from reusable fragments in [`camunda-value
 | `orchestration-oidc.yaml` | OIDC configuration for Orchestration |
 | `optimize-elasticsearch.yaml` | Optimize connected to Elasticsearch |
 | `enable-multitenancy.yaml` | Multi-tenancy support |
+| `orchestration-topology.yaml` | Broker count, partitions and replication factor from `CAMUNDA_CLUSTER_SIZE`, `CAMUNDA_PARTITION_COUNT`, `CAMUNDA_REPLICATION_FACTOR` |
+| `orchestration-secret-store-file.yaml` | File secret store backed by the `camunda-process-secrets` Secret from [`secret-manager/file-store`](../secret-manager/file-store) |
 
 See [`my-camunda-values.yaml`](./my-camunda-values.yaml) for additional overrides (resources, env vars).
 

@@ -108,6 +108,41 @@ camunda-values.yaml: delete-camunda-values
 WEBMODELER_PUSHER_APP_KEY ?= webmodeler-pusher-key-changeme
 WEBMODELER_PUSHER_APP_SECRET ?= webmodeler-pusher-secret-changeme
 
+# Kubernetes Secret backing the 8.10 file secret store (orchestration-secret-store-file.yaml).
+# Normally run through recipes/camunda/secret-manager/file-store.
+# Every variable named SECRET_<NAME> that is set in a config.mk or on the make command line becomes a secret <NAME>,
+# used in a process as camunda.secrets.<NAME>. Plain environment variables are ignored on purpose.
+# Values are passed to the shell through exported variables and base64 encoded into a manifest piped to kubectl,
+# so they never appear in the make output or in a process argument list.
+# In a config.mk, write a literal $ as $$ and a literal # as \#. Re-running updates the Secret in place and drops removed keys.
+PROCESS_SECRET_VARS = $(foreach v,$(filter SECRET_%,$(.VARIABLES)),$(if $(filter file command line,$(origin $(v))),$(v)))
+export $(PROCESS_SECRET_VARS)
+
+.PHONY: create-process-secrets
+create-process-secrets: namespace
+	@names="$(PROCESS_SECRET_VARS)"; \
+	for n in $$names; do \
+	  key=$${n#SECRET_}; \
+	  case "$$key" in ''|*[!A-Za-z0-9_-]*) echo "ERROR: $$n: a secret name may only contain letters, digits, _ and -"; exit 1;; esac; \
+	  if [ $${#key} -gt 240 ]; then echo "ERROR: $$n: a secret name may have at most 240 characters"; exit 1; fi; \
+	done; \
+	if [ -n "$$names" ]; then \
+	  echo "Creating camunda-process-secrets with: $$(for n in $$names; do printf '%s ' "$${n#SECRET_}"; done)"; \
+	else \
+	  echo "No SECRET_* variables found in a config.mk or on the command line, creating an empty camunda-process-secrets"; \
+	fi; \
+	{ \
+	  printf 'apiVersion: v1\nkind: Secret\nmetadata:\n  name: camunda-process-secrets\n  namespace: %s\ntype: Opaque\n' "$(CAMUNDA_NAMESPACE)"; \
+	  if [ -n "$$names" ]; then echo "data:"; fi; \
+	  for n in $$names; do \
+	    printf '  %s: "%s"\n' "$${n#SECRET_}" "$$(printf %s "$$(printenv $$n)" | base64 | tr -d '\n')"; \
+	  done; \
+	} | kubectl apply -f -
+
+.PHONY: delete-process-secrets
+delete-process-secrets:
+	-kubectl delete secret camunda-process-secrets --namespace $(CAMUNDA_NAMESPACE)
+
 .PHONY: create-camunda-credentials
 create-camunda-credentials: namespace
 	-kubectl delete secret camunda-credentials --namespace $(CAMUNDA_NAMESPACE)
