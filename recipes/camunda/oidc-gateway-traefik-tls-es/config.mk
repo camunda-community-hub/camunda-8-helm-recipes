@@ -37,6 +37,10 @@ CAMUNDA_PARTITION_COUNT ?= 1
 # All components share HOST_NAME with context-path routing;
 # Traefik IngressRoute CRDs handle TLS termination and path-based dispatch.
 HOST_NAME ?= example.com
+
+# Used by `make update-route53-dns` (AWS) to find the Traefik load balancer
+LB_SERVICE ?= $(TRAEFIK_RELEASE_NAME)
+LB_NAMESPACE ?= $(TRAEFIK_NAMESPACE)
 TLS_SECRET_NAME ?= tls-secret
 
 IDENTITY_EXT_URL ?= https://$(HOST_NAME)

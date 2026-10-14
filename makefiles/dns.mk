@@ -9,6 +9,11 @@ DNS_TTL ?= 60
 TRAEFIK_NAMESPACE ?= traefik
 TRAEFIK_RELEASE_NAME ?= traefik
 
+# Which LoadBalancer service update-route53-dns reads. Defaults to ingress-nginx.
+# Traefik recipes set LB_SERVICE ?= $(TRAEFIK_RELEASE_NAME) and LB_NAMESPACE ?= $(TRAEFIK_NAMESPACE).
+LB_SERVICE ?= ingress-nginx-controller
+LB_NAMESPACE ?= ingress-nginx
+
 # Upserts A records in GCP Cloud DNS for HOST_NAME and grpc.HOST_NAME pointing to the Traefik LB IP.
 # Requires HOST_NAME (e.g. mydeployment.aks.c8sm.com) and GCP_DNS_ZONE (default: aks) to be set.
 # Usage: make update-gcp-dns
@@ -38,16 +43,17 @@ delete-gcp-dns:
 	-gcloud dns record-sets delete "grpc.$(HOST_NAME)." --type=A --zone=$(GCP_DNS_ZONE) --quiet
 	@echo "✅ DNS records deleted (or were already absent)"
 
-# Upserts an A record in Route 53 pointing HOST_NAME to the ingress-nginx ELB IP.
+# Upserts A records in Route 53 pointing HOST_NAME and grpc.HOST_NAME to the ELB/NLB IP of $(LB_SERVICE).
+# The hostname is resolved to a single IP with dig. LB IPs can change, so re-run if the records go stale.
 # Requires HOSTED_ZONE_NAME (e.g. aws.c8sm.com) and HOST_NAME to be set (override in root config.mk).
 # Usage: make update-route53-dns
 .PHONY: update-route53-dns
 update-route53-dns:
-	@echo "Looking up ELB hostname from ingress-nginx service..."
-	@ELB_HOSTNAME=$$(kubectl get service ingress-nginx-controller -n ingress-nginx \
+	@echo "Looking up ELB hostname from $(LB_NAMESPACE)/$(LB_SERVICE) service..."
+	@ELB_HOSTNAME=$$(kubectl get service $(LB_SERVICE) -n $(LB_NAMESPACE) \
 		--output jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null); \
 	if [ -z "$$ELB_HOSTNAME" ]; then \
-		echo "❌ No ELB hostname found. Is ingress-nginx running?"; exit 1; \
+		echo "❌ No ELB hostname found. Is $(LB_SERVICE) running in $(LB_NAMESPACE)?"; exit 1; \
 	fi; \
 	echo "ELB Hostname: $$ELB_HOSTNAME"; \
 	IP=$$(dig +short $$ELB_HOSTNAME | head -1); \

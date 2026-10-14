@@ -5,7 +5,7 @@ DEPLOYMENT_NAME ?= mydeployment
 
 # Cloud environment and K8s cluster
 AWS_REGION ?= ca-central-1
-AWS_ZONES ?= ['ca-central-1a', 'ca-central-1b']
+AWS_ZONES ?= 'ca-central-1a', 'ca-central-1b'
 
 # Route 53 hosted zone name for the domain used by HOST_NAME (override in root config.mk)
 HOSTED_ZONE_NAME ?= example.com

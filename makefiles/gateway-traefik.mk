@@ -6,6 +6,9 @@ TRAEFIK_NAMESPACE ?= traefik
 TRAEFIK_RELEASE_NAME ?= traefik
 TRAEFIK_CHART ?= traefik/traefik
 TRAEFIK_CHART_VERSION ?= 34.5.0
+# Extra helm args, e.g. on AWS for an NLB instead of a Classic LB:
+#   TRAEFIK_HELM_ARGS = --set-string service.annotations."service\\.beta\\.kubernetes\\.io/aws-load-balancer-type"=nlb
+TRAEFIK_HELM_ARGS ?=
 
 .PHONY: gateway-traefik
 gateway-traefik:
@@ -14,7 +17,7 @@ gateway-traefik:
 	helm search repo traefik/traefik
 	helm upgrade --install $(TRAEFIK_RELEASE_NAME) $(TRAEFIK_CHART) \
 	  --namespace $(TRAEFIK_NAMESPACE) --create-namespace --wait \
-	  --version $(TRAEFIK_CHART_VERSION)
+	  --version $(TRAEFIK_CHART_VERSION) $(TRAEFIK_HELM_ARGS)
 
 .PHONY: clean-gateway-traefik
 clean-gateway-traefik:
