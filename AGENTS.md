@@ -88,9 +88,9 @@ Each recipe under `recipes/camunda/` contains:
 | `basic-ingress-nginx-tls` | ingress-nginx-host, metrics, connectors-enabled, orchestration-elasticsearch, orchestration-topology, my-camunda-values | **Chart 15 / Camunda 8.10.** Minimal setup, no auth; ECK Elasticsearch backend (`recipes/elasticsearch`) |
 | `oidc-gateway-traefik-tls` | metrics, oidc, identity-enabled, hub-enabled, orchestration-opensearch, orchestration-oidc, optimize-opensearch, orchestration-topology, my-camunda-values | **Chart 15 / Camunda 8.10.** Traefik IngressRoute CRDs; external OpenSearch; CloudNativePG Postgres; Keycloak operator; Camunda Hub |
 | `oidc-gateway-traefik-tls-es` | enable-elasticsearch, metrics, oidc, identity-keycloak-internal-postgres, modeler-enabled, modeler-internal-postgres, orchestration-elasticsearch, orchestration-oidc, enable-multitenancy, my-camunda-values | Traefik IngressRoute CRDs; Elasticsearch; internal Postgres |
-| `rdbms-postgres` | orchestration-rdbms-postgres, my-camunda-values | External Aurora/Postgres backend; no ingress |
+| `rdbms-postgres` | orchestration-rdbms-postgres, orchestration-topology, my-camunda-values | **Chart 15 / Camunda 8.10.** External Aurora/Postgres backend; no ingress |
 | `kind/hub` (in `recipes/kind/`) | ingress-nginx-host, identity-own-hostname, oidc-external-keycloak, connectors-enabled, orchestration-rdbms-postgres, hub-enabled, my-camunda-values | **Chart 15 / Camunda 8.10 alpha.** Local only: Camunda Hub, own Keycloak and PostgreSQL deployed in-cluster, Identity on its own hostname, minimal 1-broker Zeebe |
-| `rdbms-postgres-oidc` | enable-ingress-nginx, identity-keycloak-external-postgres, connectors-oidc, orchestration-rdbms-postgres, orchestration-oidc, my-camunda-values | External Postgres + Keycloak OIDC for Orchestration and Connectors; ingress nginx (HTTP, no TLS) |
+| `rdbms-postgres-oidc` | ingress-nginx-host, oidc, identity-enabled, orchestration-rdbms-postgres, orchestration-oidc, orchestration-topology, my-camunda-values | **Chart 15 / Camunda 8.10.** External Postgres for Camunda RDBMS and Identity; Keycloak operator for OIDC (`recipes/postgres`, `recipes/keycloak`); nginx ingress with TLS |
 
 ---
 
