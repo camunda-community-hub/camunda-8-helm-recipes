@@ -1,29 +1,35 @@
 # Camunda 8 with OIDC, Traefik Gateway & TLS
 
-Sample of how to configure Camunda 8.9 with Traefik IngressRoute CRDs and TLS certificates.
+Sample of how to configure Camunda 8.10 (Helm chart 15) with Traefik IngressRoute CRDs, TLS certificates and an external OpenSearch cluster.
 Keycloak is used for OIDC authentication. All components share a single domain with context-path routing, consistent with the nginx ingress recipes.
 
 ## Features
 
 This recipe provides:
 - **Traefik IngressRoute CRDs** — HTTP→HTTPS redirect, path-based routing, gRPC routing for Zeebe
-- **Keycloak and Identity** — OIDC authentication with external PostgreSQL
+- **Keycloak and Identity** — OIDC authentication, Keycloak run by the Keycloak operator, Identity on CloudNativePG PostgreSQL
 - **Orchestration Cluster** — Zeebe broker with embedded Operate & Tasklist
 - **Connectors** — with OIDC authentication
 - **Optimize** — connected to OpenSearch
-- **Web Modeler** — webapp + websockets, external PostgreSQL
-- **Console** — with managed release configuration
-- **OpenSearch** — external cluster (Elasticsearch disabled)
+- **Camunda Hub** — Web Modeler and Console in one component, on CloudNativePG PostgreSQL
+- **OpenSearch** — external cluster, not deployed by this recipe
 
 ## Prerequisites
 
+Chart 15 does not bundle Keycloak or PostgreSQL. Install them first with their own recipes:
+
+```bash
+make -C ../../postgres   # CloudNativePG operator + pg-identity, pg-keycloak, pg-hub
+make -C ../../keycloak   # Keycloak operator + Keycloak (set KEYCLOAK_INGRESS ?= none, Traefik routes /auth)
+```
+
+Also needed:
 - An existing Kubernetes cluster with **Traefik** installed (see [`recipes/gateway-traefik`](../../gateway-traefik))
 - Traefik CRDs (`IngressRoute`, `IngressRouteTCP`, `Middleware`) available in the cluster
-- **OpenSearch** cluster accessible from the Camunda namespace
-- **External PostgreSQL** for Keycloak and Web Modeler databases
+- **OpenSearch** cluster accessible from the Camunda namespace (set `OPENSEARCH_*` in `config.mk`). Chart 15 does not bundle it and there is no recipe for it here
 - A TLS secret (or cert-manager) for your domain
 - `kubectl` configured to connect to your cluster
-- `helm` version 3.7.0 or later
+- `helm` version 4 (Helm 3 works but is end of life in 2027) and `yq`
 - GNU `make`
 
 ## Configuration
@@ -32,15 +38,14 @@ The `camunda-values.yaml` is composed from reusable fragments in [`camunda-value
 
 | Fragment | Purpose |
 |---|---|
-| `enable-opensearch.yaml` | Global OpenSearch connection |
 | `enable-metrics.yaml` | Prometheus ServiceMonitor |
 | `oidc.yaml` | OIDC authentication (issuer URLs, client secrets, redirects) |
-| `identity-keycloak-external-postgres.yaml` | Identity + Keycloak + external database |
-| `modeler-enabled.yaml` | Web Modeler base config |
-| `modeler-external-postgres.yaml` | Modeler external database |
-| `orchestration-opensearch.yaml` | Orchestration with OpenSearch |
+| `identity-enabled.yaml` | Management Identity on external PostgreSQL |
+| `hub-enabled.yaml` | Camunda Hub (replaces Web Modeler and Console) on external PostgreSQL |
+| `orchestration-opensearch.yaml` | Orchestration with OpenSearch secondary storage |
+| `orchestration-oidc.yaml` | OIDC configuration for Orchestration |
 | `optimize-opensearch.yaml` | Optimize connected to OpenSearch |
-| `console-enabled.yaml` | Console with managed releases |
+| `orchestration-topology.yaml` | Broker count, partitions and replication factor from `CAMUNDA_CLUSTER_SIZE`, `CAMUNDA_PARTITION_COUNT`, `CAMUNDA_REPLICATION_FACTOR` |
 
 See [`my-camunda-values.yaml`](./my-camunda-values.yaml) for additional overrides (resources, env vars).
 
@@ -89,8 +94,8 @@ Key variables to set in your root `config.mk`:
 ```makefile
 HOST_NAME = my-camunda.example.com
 TLS_SECRET_NAME = my-tls-secret
-POSTGRES_HOST = 10.0.0.1
 OPENSEARCH_HOST = opensearch.shared.svc.cluster.local
+OPENSEARCH_PASSWORD = my-opensearch-password
 ```
 
 ## Troubleshooting

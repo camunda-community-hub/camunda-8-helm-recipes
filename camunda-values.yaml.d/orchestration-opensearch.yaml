@@ -1,19 +1,15 @@
-# Orchestration cluster configured for OpenSearch as secondary storage.
-# Zeebe exports to OpenSearch; Operate and Tasklist read from OpenSearch
-# Combine this with enable-opensearch.yaml which configures global.opensearch.*
-
+# Orchestration Cluster secondary storage in an external OpenSearch cluster (chart 15 / Camunda 8.10).
+# The connection comes from OPENSEARCH_PROTOCOL, OPENSEARCH_HOST, OPENSEARCH_PORT and OPENSEARCH_USERNAME in config.mk.
+# Chart 15 has no global.opensearch. The password is read from the camunda-credentials secret (opensearch-password).
+# Chart 15 does not bundle OpenSearch. Pair with optimize-opensearch.yaml.
 orchestration:
-  enabled: true
-  contextPath: "/orchestration"
   data:
     secondaryStorage:
+      type: opensearch
       opensearch:
+        url: <OPENSEARCH_PROTOCOL>://<OPENSEARCH_HOST>:<OPENSEARCH_PORT>
         auth:
+          username: <OPENSEARCH_USERNAME>
           secret:
-            existingSecret: "camunda-credentials"
-            existingSecretKey: "opensearch-password"
-  env:
-    - name: SPRING_PROFILES_ACTIVE
-      value: "broker,identity,operate,tasklist,consolidated-auth"
-    - name: SERVER_FORWARD_HEADERS_STRATEGY
-      value: "framework"
+            existingSecret: camunda-credentials
+            existingSecretKey: opensearch-password
