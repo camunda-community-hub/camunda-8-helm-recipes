@@ -70,8 +70,8 @@ Variable precedence, highest first: CLI > root `config.mk` (user-specific, gitig
 - Golden tests only prove the YAML is stable, not that it is valid. Also run
   `helm template camunda camunda/camunda-platform --version <chart> -n camunda -f camunda-values.yaml` against
   the target chart (use an explicit alpha version for prereleases); it catches removed keys and failed constraints.
-- As of 2026-10-01 the golden samples for `oidc-ingress-nginx-tls` and `oidc-gateway-traefik-tls` already fail on a
-  pristine `HEAD`. Verify with a `git archive HEAD` copy before assuming your change broke them.
+- Generate and test golden files without your root `config.mk` (for example in an rsync copy of the repo that
+  excludes `/config.mk`), otherwise local overrides leak into the sample.
 
 ## Checklist for a new or changed recipe
 1. Reuse existing modules, recipes and fragments; add new ones only for new concerns.
