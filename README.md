@@ -8,8 +8,11 @@ This is a Community Project that helps to install Camunda and other supporting t
 Allways refer to the [official installation procedures](https://docs.camunda.io/docs/self-managed/deployment/helm/)
 first and use the recipes provided here as additional examples.
 
-This repository contains Helm chart values that are compatible with Camunda 8.9 and higher,
-i.e. Camunda Helm Chart 14 and higher.
+This branch (`main`) targets **Camunda 8.10**, i.e. Camunda Helm Chart 15.
+Looking for Camunda 8.9 (Helm Chart 14)? Check out the [`8.9` tag](https://github.com/camunda-community-hub/camunda-8-helm-recipes/tree/8.9):
+
+    git checkout 8.9
+
 Example configurations for older versions can be found in the old repository of
 [Camunda 8 Helm Profiles](https://github.com/camunda-community-hub/camunda-8-helm-profiles).
 
