@@ -8,13 +8,17 @@ CAMUNDA_NAMESPACE ?= camunda
 CAMUNDA_RELEASE_NAME ?= camunda
 
 CAMUNDA_CHART ?= camunda/camunda-platform
-CAMUNDA_HELM_CHART_VERSION ?= 14.4.0
-CAMUNDA_VERSION ?= 8.9.0
+CAMUNDA_HELM_CHART_VERSION ?= 15.1.0
+CAMUNDA_VERSION ?= 8.10.0
 
+# Prerequisites (chart 15 does not bundle Keycloak or its database):
+#   recipes/postgres   CloudNativePG, needed for the Keycloak database (pg-keycloak)
+#   recipes/keycloak   Keycloak operator (served under /auth through the nginx Ingress)
+# Camunda's RDBMS storage and Identity use the external PostgreSQL below (POSTGRES_HOST).
 CAMUNDA_HELM_VALUES ?= \
-  $(root)/camunda-values.yaml.d/enable-ingress-nginx.yaml \
-  $(root)/camunda-values.yaml.d/identity-keycloak-external-postgres.yaml \
-  $(root)/camunda-values.yaml.d/connectors-oidc.yaml \
+  $(root)/camunda-values.yaml.d/ingress-nginx-host.yaml \
+  $(root)/camunda-values.yaml.d/oidc.yaml \
+  $(root)/camunda-values.yaml.d/identity-enabled.yaml \
   $(root)/camunda-values.yaml.d/orchestration-rdbms-postgres.yaml \
   $(root)/camunda-values.yaml.d/orchestration-oidc.yaml \
   $(root)/camunda-values.yaml.d/orchestration-topology.yaml \
@@ -33,16 +37,18 @@ CAMUNDA_INGRESS_GRPC_NAME ?= camunda-camunda-platform-grpc
 HOST_NAME ?= example.camunda.com
 IDENTITY_EXT_URL ?= https://example.camunda.com
 ORCHESTRATION_EXT_URL ?= https://example.camunda.com
+OPTIMIZE_EXT_URL ?= https://example.camunda.com
 WEB_MODELER_EXT_URL ?= https://example.camunda.com
 
-# Keycloak
+# Keycloak (operator-managed, recipes/keycloak). The operator creates the admin user temp-admin.
 KEYCLOAK_EXT_URL ?= https://example.camunda.com
-KEYCLOAK_ADMIN_USERNAME ?= admin
+KEYCLOAK_ADMIN_USERNAME ?= temp-admin
 KEYCLOAK_REALM ?= camunda-platform
 
 # Postgresql
 POSTGRES_HOST ?= mypostgresql.camunda.com
 POSTGRES_CAMUNDA_HOST ?= $(POSTGRES_HOST)
+POSTGRES_IDENTITY_HOST ?= $(POSTGRES_HOST)
 
 POSTGRES_MASTER_USERNAME ?= postgres
 POSTGRES_MASTER_PASSWORD ?= CHANGEME

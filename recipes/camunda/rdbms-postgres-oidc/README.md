@@ -1,6 +1,6 @@
 # Camunda 8 with External Postgres and OIDC
 
-Sample of how to configure Camunda 8.9 with Postgres for RDBMS storage and Keycloak for OIDC authentication.
+Sample of how to configure Camunda 8.10 (Helm chart 15) with Postgres for RDBMS storage and Keycloak for OIDC authentication.
 
 https://docs.camunda.io/docs/next/self-managed/deployment/helm/configure/database/rdbms/
 
@@ -10,18 +10,26 @@ https://docs.camunda.io/docs/next/self-managed/concepts/databases/relational-db/
 
 This recipe provides:
 - **Orchestration Cluster**: Configured to use external PostgreSQL database as secondary storage
-- **Keycloak**: Installed with an external PostgreSQL backend; used as the OIDC identity provider
+- **Keycloak**: Run by the Keycloak operator on a CloudNativePG database; used as the OIDC identity provider
 - **Identity**: Management identity service backed by external PostgreSQL
 - **OIDC authentication**: Enabled for the Orchestration cluster and Connectors
-- **Ingress**: nginx ingress controller with HTTP routing
+- **Ingress**: nginx ingress controller with TLS
 
 ## Prerequisites
 
-- An existing Kubernetes cluster using Kind, Google, AWS or Azure, etc
-- A PostgreSQL database accessible from the cluster (see the `aws/eks-and-aurora-postgres` recipe for an example) with databases provisioned for Camunda, Keycloak, and Identity (see `make setup-all-dbs`)
+Chart 15 does not bundle Keycloak or its database. Install them first with their own recipes:
+
+```bash
+make -C ../../postgres   # CloudNativePG operator + pg-identity, pg-keycloak, pg-hub (only pg-keycloak is used here)
+make -C ../../keycloak   # Keycloak operator + Keycloak, served under /auth through an nginx Ingress
+```
+
+Also needed:
+- An existing Kubernetes cluster using Kind, Google, AWS or Azure, etc, with an nginx ingress controller (see [`recipes/ingress-nginx`](../../ingress-nginx))
+- A PostgreSQL database accessible from the cluster (see the `aws/eks-and-aurora-postgres` recipe for an example) with databases provisioned for Camunda and Identity (see `make setup-all-dbs`)
 - A DNS hostname resolving to your cluster's ingress controller IP
 - `kubectl` configured to connect to your cluster
-- `helm` version 3.7.0 or later
+- `helm` version 4 (Helm 3 works but is end of life in 2027) and `yq`
 - GNU `make`
 
 ## Configuration
@@ -35,7 +43,6 @@ Set the following in a root-level `config.mk` (not committed) to override the re
 | `POSTGRES_MASTER_USERNAME` | PostgreSQL master username | `postgres` |
 | `POSTGRES_MASTER_PASSWORD` | PostgreSQL master password | `CHANGEME` |
 | `POSTGRES_CAMUNDA_DB` / `POSTGRES_CAMUNDA_USERNAME` | Camunda DB name and user | `camunda` / `camunda` |
-| `POSTGRES_KEYCLOAK_DB` / `POSTGRES_KEYCLOAK_USERNAME` | Keycloak DB name and user | `bitnami_keycloak` / `bn_keycloak` |
 | `POSTGRES_IDENTITY_DB` / `POSTGRES_IDENTITY_USERNAME` | Identity DB name and user | `identity` / `identity` |
 | `DEFAULT_PASSWORD` | Password used for Camunda component credentials | `changeme` |
 
@@ -51,12 +58,6 @@ Create credentials secret, then install:
 make
 ```
 
-After installation, create the Keycloak admin user:
-
-```bash
-make create-keycloak-admin-user
-```
-
 ## Verify Installation
 
 Check that all pods are running:
@@ -67,9 +68,10 @@ make pods
 
 Once ingress is healthy, access the services at your configured hostname:
 
-- Keycloak: `http://<HOST_NAME>/auth`
-- Operate UI: `http://<HOST_NAME>/orchestration/operate`
-- Tasklist UI: `http://<HOST_NAME>/orchestration/tasklist`
+- Keycloak: `https://<HOST_NAME>/auth`
+- Identity: `https://<HOST_NAME>/management`
+- Operate UI: `https://<HOST_NAME>/orchestration/operate`
+- Tasklist UI: `https://<HOST_NAME>/orchestration/tasklist`
 
 ## Uninstall
 
@@ -81,16 +83,16 @@ This will remove the Camunda installation and clean up all resources.
 
 ## Use Cases
 
-This recipe is useful for understanding how to configure Camunda 8.9 with:
+This recipe is useful for understanding how to configure Camunda 8.10 with:
 - External RDBMS (PostgreSQL) as secondary storage instead of Elasticsearch
-- Keycloak as an OIDC provider for Orchestration and Connectors
-- External PostgreSQL for Keycloak and Identity (no bundled database containers)
+- Keycloak (operator-managed) as an OIDC provider for Orchestration and Connectors
+- External PostgreSQL for Identity and Camunda's RDBMS storage
 
 ## Limitations
 
 ⚠️ **Important**: This is provided for reference and learning, however it is **not suitable for production** use because:
 
-- **No TLS**: Ingress is HTTP only; no certificates are configured
+- **TLS certificate**: the ingress expects a `tls-secret`, for example from `make request-certificate`, see [`recipes/letsencrypt`](../../letsencrypt)
 - **No high availability**: Single instances of all components
 
 ## Customization

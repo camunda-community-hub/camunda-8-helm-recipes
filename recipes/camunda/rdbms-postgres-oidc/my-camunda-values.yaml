@@ -1,3 +1,11 @@
 # Helm chart values are imported from `../camunda-values.yaml.d` via `config.mk`.
 # This file only contains additional overrides.
 # Note that array values, e.g. `zeebe.env` can NOT be merged by Helm.
+
+# Identity uses the external PostgreSQL (POSTGRES_HOST) instead of the CloudNativePG cluster that
+# identity-enabled.yaml assumes. The password comes from camunda-credentials.
+identity:
+  externalDatabase:
+    secret:
+      existingSecret: camunda-credentials
+      existingSecretKey: identity-postgresql-user-password
