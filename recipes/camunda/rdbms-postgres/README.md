@@ -1,6 +1,6 @@
 # Camunda 8 with External Postgres
 
-Sample of how to configure 8.9 with Postgres for RDBMS storage.
+Sample of how to configure Camunda 8.10 (Helm chart 15) with Postgres for RDBMS storage.
 
 https://docs.camunda.io/docs/next/self-managed/deployment/helm/configure/database/rdbms/
 
@@ -16,7 +16,7 @@ This profile provides:
 - An existing Kubernetes cluster using Kind, Google, AWS or Azure, etc
 - A Postgres database accessible from the cluster (see the `aws/eks-and-aurora-postgres` recipe for an example)
 - `kubectl` configured to connect to your cluster
-- `helm` version 3.7.0 or later
+- `helm` version 4 (Helm 3 works but is end of life in 2027) and `yq`
 - GNU `make`
 
 ## Helm values file
@@ -58,7 +58,7 @@ This will remove the Camunda installation and clean up all resources.
 
 ## Use Cases
 
-This profile is good to understand how to configure Camunda 8.9 with rdbms for secondary storage
+This profile is good to understand how to configure Camunda 8.10 with rdbms for secondary storage
 
 ## Limitations
 
