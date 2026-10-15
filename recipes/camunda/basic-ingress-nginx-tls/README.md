@@ -1,24 +1,26 @@
-# Camunda 8 with External Postgres
+# Camunda 8 with nginx Ingress, TLS & Elasticsearch
 
-Sample of how to configure 8.9 with nginx ingress and tls.
-
-## Example Helm Command: 
-
-```shell
-helm upgrade --install --namespace camunda camunda /Users/dave/code/camunda-platform-helm/charts/camunda-platform-8.9 \
--f ./camunda-values.yaml --version 14.4.0 --skip-crds
-```
+Sample of how to configure Camunda 8.10 (Helm chart 15) with nginx ingress and tls.
 
 ## Features
 
 This profile provides:
-- **Orchestration Cluster**: Configured to use nginx ingress with TLS
+- **Orchestration Cluster**: Zeebe, Operate and Tasklist with an Elasticsearch backend, behind nginx ingress with TLS
+- **Connectors**
+- No authentication (no Keycloak or Identity)
 
 ## Prerequisites
 
-- An existing Kubernetes cluster using Kind, Google, AWS or Azure, etc
+Chart 15 does not bundle Elasticsearch. Install it first with its own recipe:
+
+```bash
+make -C ../../elasticsearch   # ECK operator + Elasticsearch
+```
+
+Also needed:
+- An existing Kubernetes cluster using Kind, Google, AWS or Azure, etc, with an nginx ingress controller (see [`recipes/ingress-nginx`](../../ingress-nginx))
 - `kubectl` configured to connect to your cluster
-- `helm` version 3.7.0 or later
+- `helm` version 4 (Helm 3 works but is end of life in 2027) and `yq`
 - GNU `make`
 
 ## Helm values file
@@ -49,7 +51,7 @@ This will remove the Camunda installation and clean up all resources.
 
 ## Use Cases
 
-This profile is good to understand how to configure Camunda 8.9 with nginx ingress and tls for network access
+This profile is good to understand how to configure Camunda 8.10 with nginx ingress and tls for network access
 
 ## Customization
 

@@ -1,20 +1,22 @@
-elasticsearch:
-  enabled: true
+# Chart 15 (Camunda 8.10+) ingress-nginx with TLS. The hostname moved from global.ingress.host
+# (removed in chart 15) to global.host. Supersedes enable-ingress-nginx.yaml for chart 15.
+# Helm chart values are imported from `../camunda-values.yaml.d` via `config.mk`.
+# This file only contains additional overrides.
+# Note that array values, e.g. `zeebe.env` can NOT be merged by Helm.
 global:
+  host: "example.camunda.com"
   ingress:
     enabled: true
     className: nginx
-    host: "example.camunda.com"
     tls:
       enabled: true
       secretName: "tls-secret"
-  elasticsearch:
-    enabled: true
+# Serve the Orchestration Cluster (Operate, Tasklist, REST API) at the root of HOST_NAME.
+# Chart 15 only renders the HTTP ingress rule when a context path is set.
 orchestration:
   gateway:
     grpc:
       enabled: true
-  contextPath: "/"
   ingress:
     grpc:
       enabled: true
@@ -26,7 +28,20 @@ orchestration:
   data:
     secondaryStorage:
       type: elasticsearch
+      elasticsearch:
+        url: http://elasticsearch-es-http:9200
+        auth:
+          username: elastic
+          secret:
+            existingSecret: elasticsearch-es-elastic-user
+            existingSecretKey: elastic
+  clusterSize: "1"
+  partitionCount: "1"
+  replicationFactor: "1"
+  contextPath: "/"
 prometheusServiceMonitor:
   enabled: true
+  labels:
+    release: metrics
 connectors:
   enabled: true
