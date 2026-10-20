@@ -1,0 +1,74 @@
+# Benchmark tool for a Camunda 8 SaaS cluster.
+# https://github.com/camunda-community-hub/camunda-8-benchmark
+#
+# Rendered with envsubst by 'make benchmark-saas'. Set SAAS_CLUSTER_ID, SAAS_REGION, SAAS_CLIENT_ID and
+# SAAS_CLIENT_SECRET in the root config.mk. The client needs the "Orchestration Cluster API" scope.
+#
+# The saas mode derives the gRPC address, token URL and audience from the cluster ID and region,
+# so none of them are set here. Setting any of them would override the mode defaults.
+#
+# This runs inside your Kubernetes cluster and calls SaaS over the internet. The rate is fixed and low on purpose:
+# unlike benchmark-oidc.yaml it does not ramp up until backpressure.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: benchmark-saas
+  labels:
+    app: benchmark-saas
+spec:
+  selector:
+    matchLabels:
+      app: benchmark-saas
+  replicas: ${BENCHMARK_REPLICAS}
+  template:
+    metadata:
+      labels:
+        app: benchmark-saas
+    spec:
+      containers:
+      - name: benchmark
+        image: camundacommunityhub/camunda-8-benchmark:main
+        imagePullPolicy: Always
+        env:
+          - name: BENCHMARK_CLIENT_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: benchmark-saas-credentials
+                key: client-secret
+          - name: JAVA_TOOL_OPTIONS
+            value: >-
+              -Dcamunda.client.mode=saas
+              -Dcamunda.client.cloud.cluster-id=${SAAS_CLUSTER_ID}
+              -Dcamunda.client.cloud.region=${SAAS_REGION}
+              -Dcamunda.client.auth.client-id=${SAAS_CLIENT_ID}
+              -Dcamunda.client.auth.client-secret=$(BENCHMARK_CLIENT_SECRET)
+              -Dcamunda.client.zeebe.prefer-rest-over-grpc=false
+              -Dcamunda.client.zeebe.request-timeout=600s
+              -Dcamunda.client.zeebe.defaults.poll-interval=1ms
+              -Dzeebe.client.default-job-worker-stream-enabled=true
+              -Dzeebe.client.worker.max-jobs-active=2000
+              -Dbenchmark.startPiPerSecond=${SAAS_BENCHMARK_PI_PER_SECOND}
+              -Dbenchmark.startRateAdjustmentStrategy=fixed
+              -Dbenchmark.taskCompletionDelay=10
+              -Dbenchmark.bpmnProcessId=${BENCHMARK_BPMN_PROCESS_ID}
+              -Dbenchmark.jobType=benchmark-task
+              -Dbenchmark.multipleJobTypes=${BENCHMARK_MULTIPLE_JOB_TYPES}
+              -Dbenchmark.payloadPath=file:/payload.json
+              -Dbenchmark.autoDeployProcess=true
+              -Dbenchmark.warmupPhaseDurationMillis=${SAAS_BENCHMARK_WARMUP_MS}
+        resources:
+          limits:
+            cpu: "1"
+            memory: 4Gi
+          requests:
+            cpu: "1"
+            memory: 1Gi
+        volumeMounts:
+        - name: payload
+          mountPath: /payload.json
+          subPath: payload.json
+          readOnly: true
+      volumes:
+      - name: payload
+        configMap:
+          name: benchmark-payload

@@ -53,6 +53,45 @@ create-benchmark-credentials:
 	  --from-literal=client-secret=$(BENCHMARK_CLIENT_SECRET) \
 	  -n $(BENCHMARK_NAMESPACE)
 
+# Camunda SaaS. Set these in the root config.mk. They are separate from the BENCHMARK_* variables above,
+# so the self-managed settings stay untouched.
+SAAS_CLUSTER_ID ?=
+SAAS_REGION ?=
+SAAS_CLIENT_ID ?=
+SAAS_CLIENT_SECRET ?=
+SAAS_BENCHMARK_PI_PER_SECOND ?= 2
+SAAS_BENCHMARK_WARMUP_MS ?= 3000
+
+_SAAS_BENCHMARK_VARS = $$BENCHMARK_REPLICAS $$SAAS_BENCHMARK_PI_PER_SECOND $$BENCHMARK_BPMN_PROCESS_ID $$BENCHMARK_MULTIPLE_JOB_TYPES \
+  $$SAAS_BENCHMARK_WARMUP_MS $$SAAS_CLUSTER_ID $$SAAS_REGION $$SAAS_CLIENT_ID
+
+.PHONY: benchmark-saas # deploy the benchmark tool against a Camunda SaaS cluster (fixed, low rate)
+benchmark-saas:
+	@test -n "$(SAAS_CLUSTER_ID)" -a -n "$(SAAS_REGION)" -a -n "$(SAAS_CLIENT_ID)" -a -n "$(SAAS_CLIENT_SECRET)" || \
+		(echo "Set SAAS_CLUSTER_ID, SAAS_REGION, SAAS_CLIENT_ID and SAAS_CLIENT_SECRET in the root config.mk" && exit 1)
+	@kubectl create secret generic benchmark-saas-credentials \
+	  --from-literal=client-secret='$(SAAS_CLIENT_SECRET)' \
+	  -n $(BENCHMARK_NAMESPACE) --dry-run=client -o yaml | kubectl apply -f - -n $(BENCHMARK_NAMESPACE)
+	kubectl create configmap benchmark-payload \
+	  --from-file=payload.json=$(BENCHMARK_PAYLOAD_FILE) \
+	  -n $(BENCHMARK_NAMESPACE) --dry-run=client -o yaml | kubectl apply -f - -n $(BENCHMARK_NAMESPACE)
+	BENCHMARK_REPLICAS='$(BENCHMARK_REPLICAS)' SAAS_BENCHMARK_PI_PER_SECOND='$(SAAS_BENCHMARK_PI_PER_SECOND)' \
+	BENCHMARK_BPMN_PROCESS_ID='$(BENCHMARK_BPMN_PROCESS_ID)' BENCHMARK_MULTIPLE_JOB_TYPES='$(BENCHMARK_MULTIPLE_JOB_TYPES)' \
+	SAAS_BENCHMARK_WARMUP_MS='$(SAAS_BENCHMARK_WARMUP_MS)' SAAS_CLUSTER_ID='$(SAAS_CLUSTER_ID)' \
+	SAAS_REGION='$(SAAS_REGION)' SAAS_CLIENT_ID='$(SAAS_CLIENT_ID)' \
+	  envsubst '$(_SAAS_BENCHMARK_VARS)' \
+	  < $(root)/recipes/benchmark/include/benchmark-saas.yaml | kubectl apply -f - -n $(BENCHMARK_NAMESPACE)
+
+.PHONY: logs-benchmark-saas # stream logs from the SaaS benchmark pod
+logs-benchmark-saas:
+	kubectl logs -f -l app=benchmark-saas -n $(BENCHMARK_NAMESPACE)
+
+# Leaves the benchmark-payload ConfigMap alone, because the self-managed benchmark shares it.
+.PHONY: clean-benchmark-saas # remove the SaaS benchmark deployment and credentials secret
+clean-benchmark-saas:
+	-kubectl delete deployment benchmark-saas -n $(BENCHMARK_NAMESPACE) --ignore-not-found
+	-kubectl delete secret benchmark-saas-credentials -n $(BENCHMARK_NAMESPACE) --ignore-not-found
+
 .PHONY: clean-benchmark # remove the benchmark deployment, credentials, and payload ConfigMap
 clean-benchmark:
 	-kubectl delete deployment benchmark -n $(BENCHMARK_NAMESPACE)

@@ -1,0 +1,74 @@
+# k6 query benchmark for the Orchestration Cluster REST API.
+# Rendered with envsubst by 'make benchmark-query' (see makefiles/benchmark-query.mk).
+# The script comes from the benchmark-query-script ConfigMap and the client secret from benchmark-query-credentials.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: benchmark-query
+  labels:
+    app: benchmark-query
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: benchmark-query
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: k6
+        image: ${K6_IMAGE}
+        args: ["run", "--quiet", "--no-color", "/scripts/query-benchmark.js"]
+        env:
+          - name: QUERY_BASE_URL
+            value: "${QUERY_BASE_URL}"
+          - name: QUERY_AUTH
+            value: "${QUERY_AUTH}"
+          - name: QUERY_SHARED_TOKEN
+            value: "${QUERY_SHARED_TOKEN}"
+          - name: QUERY_STEPS
+            value: "${QUERY_STEPS}"
+          - name: QUERY_STEP_SECONDS
+            value: "${QUERY_STEP_SECONDS}"
+          - name: QUERY_RAMP_SECONDS
+            value: "${QUERY_RAMP_SECONDS}"
+          - name: QUERY_P95_MS
+            value: "${QUERY_P95_MS}"
+          - name: QUERY_MAX_ERROR_RATE
+            value: "${QUERY_MAX_ERROR_RATE}"
+          - name: QUERY_PROCESS_ID
+            value: "${QUERY_PROCESS_ID}"
+          - name: QUERY_DISABLED
+            value: "${QUERY_DISABLED}"
+          - name: QUERY_BATCH
+            value: "${QUERY_BATCH}"
+          - name: QUERY_PREALLOCATED_VUS
+            value: "${QUERY_PREALLOCATED_VUS}"
+          - name: QUERY_MAX_VUS
+            value: "${QUERY_MAX_VUS}"
+          - name: TOKEN_URL
+            value: "${BENCHMARK_TOKEN_URL}"
+          - name: CLIENT_ID
+            value: "${BENCHMARK_CLIENT_ID}"
+          - name: TOKEN_AUDIENCE
+            value: "${BENCHMARK_TOKEN_AUDIENCE}"
+          - name: CLIENT_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: benchmark-query-credentials
+                key: client-secret
+        resources:
+          limits:
+            cpu: "${K6_CPU}"
+            memory: ${K6_MEMORY}
+          requests:
+            cpu: "${K6_CPU}"
+            memory: ${K6_MEMORY}
+        volumeMounts:
+        - name: script
+          mountPath: /scripts
+          readOnly: true
+      volumes:
+      - name: script
+        configMap:
+          name: benchmark-query-script
