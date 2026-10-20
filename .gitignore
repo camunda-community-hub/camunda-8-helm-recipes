@@ -9,3 +9,4 @@
 **/*.bk.yaml
 /recipes/benchmark/es-storage-results/
 /recipes/kind/hub/certs
+/recipes/metrics/dashboards/

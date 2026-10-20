@@ -45,6 +45,51 @@ saas-scrape:
 	    -e "s/<SAAS_CLUSTER_ID>/$(SAAS_CLUSTER_ID)/g" \
 	    $(root)/recipes/metrics/saas-scrapeconfig.yaml | kubectl apply -n default -f -
 
+# Generates a Zeebe dashboard for SaaS clusters from the Zeebe dashboard Grafana serves (the one the chart downloads when
+# the Grafana pod starts), so it follows upstream changes. Restart Grafana to pick up a newer upstream version.
+# Edits: new uid and title, no "All" for the cluster variable, and the cluster dropdown lists only environment="saas" series.
+# When SAAS_CLUSTER_ID is set, the dashboard opens on that cluster. Otherwise Grafana selects the first one.
+# The result is generated, so it is gitignored. Import it in Grafana: Dashboards > New > Import.
+SAAS_DASHBOARD_SOURCE_UID ?= zeebe-dashboard
+SAAS_DASHBOARD_UID ?= zeebe-saas-dashboard
+SAAS_DASHBOARD_TITLE ?= Zeebe (SaaS)
+SAAS_DASHBOARD_FILE ?= $(root)/recipes/metrics/dashboards/zeebe-saas.json
+SAAS_DASHBOARD_PORT ?= 13000
+
+define _SAAS_DASHBOARD_JQ
+.dashboard
+| del(.id)
+| .uid = $$uid
+| .title = $$title
+| .tags = ["saas"]
+| .version = 0
+| .templating.list |= map(
+    if .name == "cluster" then
+      .includeAll = false
+      | del(.allValue)
+      | .query.query = "label_values(atomix_role{environment=\"saas\"}, cluster)"
+      | .options = []
+      | if $$cluster != "" then .current = {text: $$cluster, value: $$cluster} else del(.current) end
+    else . end)
+endef
+export _SAAS_DASHBOARD_JQ
+
+.PHONY: saas-dashboard # generate the Zeebe dashboard JSON for SaaS clusters from the dashboard Grafana serves
+saas-dashboard:
+	@mkdir -p $(dir $(SAAS_DASHBOARD_FILE))
+	@kubectl port-forward svc/metrics-grafana $(SAAS_DASHBOARD_PORT):80 -n default >/dev/null 2>&1 & PF_PID=$$!; \
+	trap "kill $$PF_PID 2>/dev/null" EXIT; \
+	for i in 1 2 3 4 5 6 7 8 9 10; do curl -sf localhost:$(SAAS_DASHBOARD_PORT)/api/health >/dev/null && break; sleep 1; done; \
+	GRAFANA_USER=$$(kubectl get secret grafana-credentials -n default -o jsonpath='{.data.admin-user}' | base64 --decode); \
+	GRAFANA_PASS=$$(kubectl get secret grafana-credentials -n default -o jsonpath='{.data.admin-password}' | base64 --decode); \
+	curl -sf -u "$$GRAFANA_USER:$$GRAFANA_PASS" localhost:$(SAAS_DASHBOARD_PORT)/api/dashboards/uid/$(SAAS_DASHBOARD_SOURCE_UID) \
+	  | jq -e --arg uid '$(SAAS_DASHBOARD_UID)' --arg title '$(SAAS_DASHBOARD_TITLE)' --arg cluster '$(SAAS_CLUSTER_ID)' "$$_SAAS_DASHBOARD_JQ" \
+	  > $(SAAS_DASHBOARD_FILE).tmp \
+	  && jq -e '.panels | length > 0' $(SAAS_DASHBOARD_FILE).tmp >/dev/null \
+	  && mv $(SAAS_DASHBOARD_FILE).tmp $(SAAS_DASHBOARD_FILE) \
+	  || { rm -f $(SAAS_DASHBOARD_FILE).tmp; echo "Could not fetch dashboard $(SAAS_DASHBOARD_SOURCE_UID) from Grafana"; exit 1; }
+	@echo "Wrote $(SAAS_DASHBOARD_FILE) (import it in Grafana: Dashboards > New > Import)"
+
 .PHONY: clean-saas-scrape
 clean-saas-scrape:
 	-kubectl delete scrapeconfig camunda-saas --namespace default
