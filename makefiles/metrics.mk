@@ -32,6 +32,24 @@ clean-metrics:
 	-kubectl delete pvc -l app.kubernetes.io/name=grafana -n default
 	-kubectl get crd -o name | grep 'monitoring.coreos.com' | xargs kubectl delete
 
+.PHONY: saas-scrape
+saas-scrape:
+	@test -n "$(SAAS_METRICS_HOST)" -a -n "$(SAAS_CLUSTER_ID)" -a -n "$(SAAS_METRICS_USERNAME)" -a -n "$(SAAS_METRICS_PASSWORD)" || \
+		(echo "Set SAAS_METRICS_HOST, SAAS_CLUSTER_ID, SAAS_METRICS_USERNAME and SAAS_METRICS_PASSWORD in the root config.mk" && exit 1)
+	-kubectl delete secret camunda-saas-metrics --namespace default
+	kubectl create secret generic camunda-saas-metrics \
+	  --from-literal=username=$(SAAS_METRICS_USERNAME) \
+	  --from-literal=password=$(SAAS_METRICS_PASSWORD) \
+	  --namespace default
+	sed -e "s/<SAAS_METRICS_HOST>/$(SAAS_METRICS_HOST)/g" \
+	    -e "s/<SAAS_CLUSTER_ID>/$(SAAS_CLUSTER_ID)/g" \
+	    $(root)/recipes/metrics/saas-scrapeconfig.yaml | kubectl apply -n default -f -
+
+.PHONY: clean-saas-scrape
+clean-saas-scrape:
+	-kubectl delete scrapeconfig camunda-saas --namespace default
+	-kubectl delete secret camunda-saas-metrics --namespace default
+
 .PHONY: port-grafana
 port-grafana:
 	kubectl port-forward svc/metrics-grafana-loadbalancer 8080:80 -n default

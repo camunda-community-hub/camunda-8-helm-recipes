@@ -1,0 +1,28 @@
+# Scrapes the Camunda SaaS Cluster Metrics endpoint from the existing Prometheus.
+# The release label matches the scrapeConfigSelector of the kube-prometheus-stack release "metrics".
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: ScrapeConfig
+metadata:
+  name: camunda-saas
+  labels:
+    release: metrics
+spec:
+  jobName: camunda-saas
+  # Keep the job, instance and cluster labels the endpoint already sets, so dashboards can filter on them.
+  honorLabels: true
+  scheme: HTTPS
+  metricsPath: /<SAAS_CLUSTER_ID>
+  scrapeInterval: 30s
+  scrapeTimeout: 5s
+  staticConfigs:
+    - targets:
+        - <SAAS_METRICS_HOST>
+      labels:
+        environment: saas
+  basicAuth:
+    username:
+      name: camunda-saas-metrics
+      key: username
+    password:
+      name: camunda-saas-metrics
+      key: password
