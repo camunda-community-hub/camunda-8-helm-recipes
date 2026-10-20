@@ -8,7 +8,7 @@
 // All settings come from environment variables (see recipes/benchmark-query/config.mk).
 import http from 'k6/http';
 import exec from 'k6/execution';
-import { Rate } from 'k6/metrics';
+import { Rate, Trend } from 'k6/metrics';
 
 const BASE_URL = (__ENV.QUERY_BASE_URL || 'http://camunda-zeebe-gateway:8080/orchestration').replace(/\/$/, '');
 const AUTH = (__ENV.QUERY_AUTH || 'oidc').toLowerCase();
@@ -20,6 +20,8 @@ const AUDIENCE = __ENV.TOKEN_AUDIENCE || '';
 // endpoint is rate limited (Camunda SaaS allows about one token request per second per source IP).
 // The shared token is never renewed, so the run must be shorter than the token lifetime (24h on SaaS).
 const SHARED_TOKEN = (__ENV.QUERY_SHARED_TOKEN || 'false').toLowerCase() === 'true';
+// Tag on every metric, so runs against different clusters can share one Grafana dashboard (see QUERY_TARGET).
+const TARGET = __ENV.QUERY_TARGET || 'self-managed';
 
 const STEPS = (__ENV.QUERY_STEPS || '10,25,50,100').split(',').map((s) => Number(s.trim())).filter((n) => n > 0);
 const STEP_SECONDS = Number(__ENV.QUERY_STEP_SECONDS || 120);
@@ -33,6 +35,9 @@ const DISABLED = (__ENV.QUERY_DISABLED || '').split(',').map((s) => s.trim()).fi
 const BATCH = Math.max(1, Number(__ENV.QUERY_BATCH || 1));
 
 const queryErrors = new Rate('query_errors');
+// Latency of all queries together, tagged by step only. http_req_duration is tagged per query, and percentiles of
+// separate series cannot be combined, so the overall latency graph needs its own metric.
+const queryLatency = new Trend('query_latency', true);
 
 const stages = [];
 const thresholds = {};
@@ -58,6 +63,7 @@ export const options = {
     },
   },
   thresholds,
+  tags: { target: TARGET },
   batch: Math.max(20, BATCH),
   batchPerHost: BATCH,
   summaryTrendStats: ['avg', 'med', 'p(90)', 'p(95)', 'p(99)', 'max'],
@@ -255,6 +261,7 @@ export default function (data) {
   responses.forEach((res, i) => {
     const success = ok(res);
     queryErrors.add(!success, { step });
+    queryLatency.add(res.timings.duration, { step });
     if (!success && logged < 3) {
       logged++;
       console.error(`${queries[i].name} -> ${res.status} ${String(res.body).slice(0, 200)}`);

@@ -64,6 +64,45 @@ A quick check that everything works (one step, 30 seconds):
 make QUERY_STEPS=10 QUERY_STEP_SECONDS=30 QUERY_RAMP_SECONDS=5
 ```
 
+## Against Camunda SaaS
+
+`make benchmark-query-saas` runs the same Job against a SaaS cluster. Create an API client with the **Orchestration Cluster API**
+scope in Camunda Hub (cluster, API tab) and set this in the root `config.mk`. These are separate from the `BENCHMARK_*`
+variables, so your self-managed settings stay as they are:
+
+```makefile
+SAAS_CLUSTER_ID = <cluster id>
+SAAS_REGION = <region, e.g. bru-2>
+SAAS_CLIENT_ID = <client id>
+SAAS_CLIENT_SECRET = <client secret>
+```
+
+```bash
+make benchmark-query-saas QUERY_STEPS=10 QUERY_STEP_SECONDS=30 QUERY_RAMP_SECONDS=5   # smoke test first
+```
+
+- The SaaS token endpoint allows about one token request per second per source IP, and tokens last 24 hours. The target sets
+  `QUERY_SHARED_TOKEN=true`, so the script fetches one token and shares it with all VUs. Do not run a SaaS test with a token per VU.
+- The Job runs in your Kubernetes cluster and calls SaaS over the internet, so the latency includes that network hop.
+  Compare it with an in-cluster run with that in mind.
+- If the cluster has authorizations enabled, grant the client read access in the cluster's Admin application first.
+
+## Latency in Grafana
+
+k6 can send its metrics to Prometheus, and `grafana/query-latency-dashboard.json` graphs them: REST read latency (p50, p95, p99)
+for all queries and per query, request rate, error rate and virtual users. It is client-side latency, and the only REST latency
+distribution you get for SaaS, which exposes no REST latency histogram.
+
+1. Prometheus needs the remote-write receiver. `recipes/metrics` sets `enableRemoteWriteReceiver: true`. On an existing
+   install run `make -C recipes/metrics update-metrics`, which restarts Prometheus.
+2. Run with `QUERY_PROMETHEUS_RW=true` (command line or root `config.mk`). `QUERY_PROMETHEUS_RW_URL` defaults to the Prometheus
+   service of `recipes/metrics`.
+3. Import the dashboard in Grafana: Dashboards > New > Import.
+
+Every metric carries a `target` tag (`QUERY_TARGET`, default `self-managed`, `saas` for `benchmark-query-saas`), so runs against
+different clusters show up side by side. Percentiles are cumulative within a step: each line is a running percentile since the step
+started, and its last value matches the results table. The ramp at the start of each step is left out.
+
 ## Reading the results
 
 The Job prints one line per step:

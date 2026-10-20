@@ -9,6 +9,15 @@ QUERY_AUTH ?= oidc
 # allows about one request per second per source IP.
 QUERY_SHARED_TOKEN ?= false
 
+# Tag on every k6 metric, to tell runs against different clusters apart in Grafana (benchmark-query-saas uses saas)
+QUERY_TARGET ?= self-managed
+
+# true: send the k6 latency metrics to Prometheus (k6 --out experimental-prometheus-rw), for the dashboard in
+# recipes/benchmark-query/grafana. Prometheus needs enableRemoteWriteReceiver (recipes/metrics sets it).
+QUERY_PROMETHEUS_RW ?= false
+QUERY_PROMETHEUS_RW_URL ?= http://metrics-kube-prometheus-st-prometheus.default:9090/api/v1/write
+QUERY_K6_OUT = $(if $(filter true,$(QUERY_PROMETHEUS_RW)),experimental-prometheus-rw,)
+
 # Load profile: requests per second per step, seconds to hold and ramp each step
 QUERY_STEPS ?= 10,25,50,100,200
 QUERY_STEP_SECONDS ?= 120
@@ -38,7 +47,7 @@ BENCHMARK_CLIENT_SECRET ?= changeme
 
 BENCHMARK_QUERY_SCRIPT ?= $(root)/recipes/benchmark-query/k6/query-benchmark.js
 
-_QUERY_VARS = $$K6_IMAGE $$QUERY_BASE_URL $$QUERY_AUTH $$QUERY_SHARED_TOKEN $$QUERY_STEPS $$QUERY_STEP_SECONDS $$QUERY_RAMP_SECONDS \
+_QUERY_VARS = $$K6_IMAGE $$QUERY_BASE_URL $$QUERY_AUTH $$QUERY_SHARED_TOKEN $$QUERY_TARGET $$QUERY_K6_OUT $$QUERY_PROMETHEUS_RW_URL $$QUERY_STEPS $$QUERY_STEP_SECONDS $$QUERY_RAMP_SECONDS \
   $$QUERY_P95_MS $$QUERY_MAX_ERROR_RATE $$QUERY_PROCESS_ID $$QUERY_DISABLED $$QUERY_BATCH $$QUERY_PREALLOCATED_VUS \
   $$QUERY_MAX_VUS $$K6_CPU $$K6_MEMORY $$BENCHMARK_TOKEN_URL $$BENCHMARK_CLIENT_ID $$BENCHMARK_TOKEN_AUDIENCE
 
@@ -51,6 +60,7 @@ benchmark-query: clean-benchmark-query
 	  --from-file=query-benchmark.js=$(BENCHMARK_QUERY_SCRIPT) \
 	  -n $(BENCHMARK_QUERY_NAMESPACE)
 	K6_IMAGE='$(K6_IMAGE)' QUERY_BASE_URL='$(QUERY_BASE_URL)' QUERY_AUTH='$(QUERY_AUTH)' QUERY_SHARED_TOKEN='$(QUERY_SHARED_TOKEN)' \
+	QUERY_TARGET='$(QUERY_TARGET)' QUERY_K6_OUT='$(QUERY_K6_OUT)' QUERY_PROMETHEUS_RW_URL='$(QUERY_PROMETHEUS_RW_URL)' \
 	QUERY_STEPS='$(QUERY_STEPS)' QUERY_STEP_SECONDS='$(QUERY_STEP_SECONDS)' QUERY_RAMP_SECONDS='$(QUERY_RAMP_SECONDS)' \
 	QUERY_P95_MS='$(QUERY_P95_MS)' QUERY_MAX_ERROR_RATE='$(QUERY_MAX_ERROR_RATE)' \
 	QUERY_PROCESS_ID='$(QUERY_PROCESS_ID)' QUERY_DISABLED='$(QUERY_DISABLED)' QUERY_BATCH='$(QUERY_BATCH)' \
@@ -73,7 +83,7 @@ benchmark-query-saas:
 		(echo "Set SAAS_CLUSTER_ID, SAAS_REGION, SAAS_CLIENT_ID and SAAS_CLIENT_SECRET in the root config.mk" && exit 1)
 	@$(MAKE) benchmark-query \
 	  QUERY_BASE_URL='https://$(SAAS_REGION).api.camunda.io/$(SAAS_CLUSTER_ID)' \
-	  QUERY_AUTH=oidc QUERY_SHARED_TOKEN=true \
+	  QUERY_AUTH=oidc QUERY_SHARED_TOKEN=true QUERY_TARGET=saas \
 	  BENCHMARK_TOKEN_URL='https://login.cloud.camunda.io/oauth/token' \
 	  BENCHMARK_TOKEN_AUDIENCE='zeebe.camunda.io' \
 	  BENCHMARK_CLIENT_ID='$(SAAS_CLIENT_ID)' \

@@ -56,6 +56,8 @@ grafana:
 prometheus:
   prometheusSpec:
     retention: 90d
+    # Lets the k6 query benchmark write its latency metrics (k6 --out experimental-prometheus-rw)
+    enableRemoteWriteReceiver: true
     storageSpec:
       volumeClaimTemplate:
         metadata:

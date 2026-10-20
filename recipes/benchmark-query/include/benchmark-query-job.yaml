@@ -26,6 +26,19 @@ spec:
             value: "${QUERY_AUTH}"
           - name: QUERY_SHARED_TOKEN
             value: "${QUERY_SHARED_TOKEN}"
+          - name: QUERY_TARGET
+            value: "${QUERY_TARGET}"
+          # Empty K6_OUT means no external output. experimental-prometheus-rw sends the metrics to Prometheus.
+          - name: K6_OUT
+            value: "${QUERY_K6_OUT}"
+          - name: K6_PROMETHEUS_RW_SERVER_URL
+            value: "${QUERY_PROMETHEUS_RW_URL}"
+          - name: K6_PROMETHEUS_RW_TREND_STATS
+            value: "p(50),p(95),p(99),max"
+          - name: K6_PROMETHEUS_RW_PUSH_INTERVAL
+            value: "5s"
+          - name: K6_PROMETHEUS_RW_STALE_MARKERS
+            value: "true"
           - name: QUERY_STEPS
             value: "${QUERY_STEPS}"
           - name: QUERY_STEP_SECONDS
