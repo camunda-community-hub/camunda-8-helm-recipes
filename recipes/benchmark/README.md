@@ -74,13 +74,13 @@ You can also edit `include/benchmark.yaml` or `include/benchmark-oidc.yaml` dire
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `benchmark.startPiPerSecond` | `5` | Initial process instance creation rate |
-| `benchmark.startRateAdjustmentStrategy` | `backpressure` | `backpressure` ramps up automatically; `fixed` holds the start rate steady |
+| `benchmark.startRateAdjustmentStrategy` | `backpressure` | `backpressure` ramps up automatically; `none` holds the start rate steady (`fixed` is not a valid value) |
 | `benchmark.startPiIncreaseFactor` | `0.1` | Rate ramp-up increment (0.1 = +10% per cycle) |
 | `benchmark.maxBackpressurePercentage` | `1.0` | Stop increasing rate above this backpressure ratio |
 | `benchmark.taskCompletionDelay` | `10` | Simulated worker processing time in milliseconds |
 | `benchmark.multipleJobTypes` | `8` | Number of distinct job types (simulates a process with N service tasks) |
 | `benchmark.warmupPhaseDurationMillis` | `3000` | Warmup period before rate adjustment begins |
-| `benchmark.autoDeployProcess` | `true` | Deploys the built-in `BenchmarkProcess` automatically |
+| `benchmark.autoDeployProcess` | `true` | Deploys the tool's own process (`benchmark_10_jobtypes`) automatically, not `BenchmarkProcess`. Set `benchmark.bpmnResource` to deploy another one |
 | `benchmark.bpmnProcessId` | `BenchmarkProcess` | Process to instantiate; set to your process ID if `autoDeployProcess=false` |
 
 ### Payload

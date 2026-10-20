@@ -4,11 +4,16 @@
 # Rendered with envsubst by 'make benchmark-saas'. Set SAAS_CLUSTER_ID, SAAS_REGION, SAAS_CLIENT_ID and
 # SAAS_CLIENT_SECRET in the root config.mk. The client needs the "Orchestration Cluster API" scope.
 #
-# The saas mode derives the gRPC address, token URL and audience from the cluster ID and region,
-# so none of them are set here. Setting any of them would override the mode defaults.
+# The connection is set explicitly (gRPC address from the cluster ID and region, SaaS token URL and audience), with
+# the same property names as benchmark-oidc.yaml. The benchmark image did not apply camunda.client.mode=saas
+# when the legacy camunda.client.zeebe.* properties were also set: it connected to localhost:26500.
 #
 # This runs inside your Kubernetes cluster and calls SaaS over the internet. The rate is fixed and low on purpose:
-# unlike benchmark-oidc.yaml it does not ramp up until backpressure.
+# unlike benchmark-oidc.yaml it does not ramp up until backpressure (strategy none = constant start rate).
+#
+# autoDeployProcess deploys the BPMN mounted from the benchmark-saas-bpmn ConfigMap (bpmn/BenchmarkProcess.bpmn),
+# the same process as the self-managed runs. Without bpmnResource the tool deploys its own process with the ID
+# benchmark_10_jobtypes, and starting BenchmarkProcess would fail with NOT_FOUND.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -37,24 +42,27 @@ spec:
                 key: client-secret
           - name: JAVA_TOOL_OPTIONS
             value: >-
-              -Dcamunda.client.mode=saas
-              -Dcamunda.client.cloud.cluster-id=${SAAS_CLUSTER_ID}
-              -Dcamunda.client.cloud.region=${SAAS_REGION}
+              -Dcamunda.client.mode=self-managed
+              -Dcamunda.client.auth.method=oidc
+              -Dcamunda.client.zeebe.grpc-address=https://${SAAS_CLUSTER_ID}.${SAAS_REGION}.zeebe.camunda.io:443
               -Dcamunda.client.auth.client-id=${SAAS_CLIENT_ID}
               -Dcamunda.client.auth.client-secret=$(BENCHMARK_CLIENT_SECRET)
+              -Dcamunda.client.auth.token-url=https://login.cloud.camunda.io/oauth/token
+              -Dcamunda.client.auth.audience=zeebe.camunda.io
               -Dcamunda.client.zeebe.prefer-rest-over-grpc=false
               -Dcamunda.client.zeebe.request-timeout=600s
               -Dcamunda.client.zeebe.defaults.poll-interval=1ms
               -Dzeebe.client.default-job-worker-stream-enabled=true
               -Dzeebe.client.worker.max-jobs-active=2000
               -Dbenchmark.startPiPerSecond=${SAAS_BENCHMARK_PI_PER_SECOND}
-              -Dbenchmark.startRateAdjustmentStrategy=fixed
+              -Dbenchmark.startRateAdjustmentStrategy=none
               -Dbenchmark.taskCompletionDelay=10
               -Dbenchmark.bpmnProcessId=${BENCHMARK_BPMN_PROCESS_ID}
               -Dbenchmark.jobType=benchmark-task
               -Dbenchmark.multipleJobTypes=${BENCHMARK_MULTIPLE_JOB_TYPES}
               -Dbenchmark.payloadPath=file:/payload.json
               -Dbenchmark.autoDeployProcess=true
+              -Dbenchmark.bpmnResource=file:/bpmn/BenchmarkProcess.bpmn
               -Dbenchmark.warmupPhaseDurationMillis=${SAAS_BENCHMARK_WARMUP_MS}
         resources:
           limits:
@@ -68,7 +76,13 @@ spec:
           mountPath: /payload.json
           subPath: payload.json
           readOnly: true
+        - name: bpmn
+          mountPath: /bpmn
+          readOnly: true
       volumes:
       - name: payload
         configMap:
           name: benchmark-payload
+      - name: bpmn
+        configMap:
+          name: benchmark-saas-bpmn

@@ -61,6 +61,7 @@ SAAS_CLIENT_ID ?=
 SAAS_CLIENT_SECRET ?=
 SAAS_BENCHMARK_PI_PER_SECOND ?= 2
 SAAS_BENCHMARK_WARMUP_MS ?= 3000
+SAAS_BENCHMARK_BPMN_FILE ?= $(root)/bpmn/BenchmarkProcess.bpmn
 
 _SAAS_BENCHMARK_VARS = $$BENCHMARK_REPLICAS $$SAAS_BENCHMARK_PI_PER_SECOND $$BENCHMARK_BPMN_PROCESS_ID $$BENCHMARK_MULTIPLE_JOB_TYPES \
   $$SAAS_BENCHMARK_WARMUP_MS $$SAAS_CLUSTER_ID $$SAAS_REGION $$SAAS_CLIENT_ID
@@ -75,6 +76,9 @@ benchmark-saas:
 	kubectl create configmap benchmark-payload \
 	  --from-file=payload.json=$(BENCHMARK_PAYLOAD_FILE) \
 	  -n $(BENCHMARK_NAMESPACE) --dry-run=client -o yaml | kubectl apply -f - -n $(BENCHMARK_NAMESPACE)
+	kubectl create configmap benchmark-saas-bpmn \
+	  --from-file=BenchmarkProcess.bpmn=$(SAAS_BENCHMARK_BPMN_FILE) \
+	  -n $(BENCHMARK_NAMESPACE) --dry-run=client -o yaml | kubectl apply -f - -n $(BENCHMARK_NAMESPACE)
 	BENCHMARK_REPLICAS='$(BENCHMARK_REPLICAS)' SAAS_BENCHMARK_PI_PER_SECOND='$(SAAS_BENCHMARK_PI_PER_SECOND)' \
 	BENCHMARK_BPMN_PROCESS_ID='$(BENCHMARK_BPMN_PROCESS_ID)' BENCHMARK_MULTIPLE_JOB_TYPES='$(BENCHMARK_MULTIPLE_JOB_TYPES)' \
 	SAAS_BENCHMARK_WARMUP_MS='$(SAAS_BENCHMARK_WARMUP_MS)' SAAS_CLUSTER_ID='$(SAAS_CLUSTER_ID)' \
@@ -87,10 +91,11 @@ logs-benchmark-saas:
 	kubectl logs -f -l app=benchmark-saas -n $(BENCHMARK_NAMESPACE)
 
 # Leaves the benchmark-payload ConfigMap alone, because the self-managed benchmark shares it.
-.PHONY: clean-benchmark-saas # remove the SaaS benchmark deployment and credentials secret
+.PHONY: clean-benchmark-saas # remove the SaaS benchmark deployment, credentials secret and BPMN ConfigMap
 clean-benchmark-saas:
 	-kubectl delete deployment benchmark-saas -n $(BENCHMARK_NAMESPACE) --ignore-not-found
 	-kubectl delete secret benchmark-saas-credentials -n $(BENCHMARK_NAMESPACE) --ignore-not-found
+	-kubectl delete configmap benchmark-saas-bpmn -n $(BENCHMARK_NAMESPACE) --ignore-not-found
 
 .PHONY: clean-benchmark # remove the benchmark deployment, credentials, and payload ConfigMap
 clean-benchmark:
