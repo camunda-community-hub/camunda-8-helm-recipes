@@ -1,0 +1,16 @@
+# kube-prometheus-stack overrides for region 1, on top of recipes/metrics/prometheus-operator-values.yml.
+# Region 1 has no Grafana. Its Prometheus scrapes this cluster and remote-writes everything to region 0's Prometheus
+# (internal load balancer, see recipes/google/include/prometheus-internal-lb.yaml). It keeps a local copy too, so
+# its data survives a region 0 outage.
+# Placeholders are substituted by `make metrics-values.yaml`.
+
+grafana:
+  enabled: false
+
+prometheus:
+  prometheusSpec:
+    # Keeps region 1's series apart from region 0's identically labelled cluster series (nodes, kube-state-metrics)
+    externalLabels:
+      region: <ZONE>
+    remoteWrite:
+      - url: <REMOTE_WRITE_URL>

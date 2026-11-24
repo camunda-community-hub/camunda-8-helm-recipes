@@ -21,11 +21,13 @@ camunda-8-helm-recipes/
 │   │   ├── Makefile             # Meta-makefile: runs test across all sub-recipes
 │   │   ├── basic-ingress-nginx-tls/
 │   │   ├── oidc-gateway-traefik-tls/   # Traefik + OpenSearch + CloudNativePG Postgres + Keycloak operator + OIDC + Hub
-│   │   ├── oidc-gateway-traefik-tls-es/ # Traefik + Elasticsearch + internal Postgres + OIDC
+│   │   ├── oidc-gateway-traefik-tls-es/ # Traefik + Elasticsearch (ECK) + CloudNativePG Postgres + Keycloak operator + OIDC + Hub + Optimize
+│   │   ├── dual-region-es-oidc/     # Orchestration Cluster stretched over two clusters (zone-aware), ES per region, OIDC, Hub, Optimize
 │   │   ├── rdbms-postgres/
 │   │   ├── rdbms-postgres-oidc/
 │   │   └── secret-manager/
 │   │       └── file-store/          # Kubernetes Secret for the 8.10 file secret store (camunda.secrets.NAME)
+│   ├── camunda-dependencies/    # Meta recipe: Traefik, cert-manager, Postgres, Keycloak, Elasticsearch, metrics (cloud agnostic)
 │   ├── gateway-traefik/         # Traefik gateway controller base recipe
 │   ├── ingress-nginx/           # Standalone nginx ingress setup
 │   ├── letsencrypt/             # cert-manager + Let's Encrypt issuers
@@ -36,6 +38,7 @@ camunda-8-helm-recipes/
 │   ├── aws/eks-dual-region/     # Dual-region EKS with VPC peering + CoreDNS chaining
 │   ├── azure/aks/               # Azure AKS cluster
 │   ├── google/gke/              # Google GKE cluster
+│   ├── google/gke-dual-region/  # Two GKE clusters in one VPC + firewall + DNS chaining (dns-chain CoreDNS)
 │   ├── tls-self-signed-certs/   # Self-signed cert generation
 │   └── metrics/                 # Prometheus + Grafana stack
 └── config.bk.mk                 # Example root config (copy to config.mk to override)
@@ -57,7 +60,7 @@ Merges all files listed in `CAMUNDA_HELM_VALUES` in order. Later files override 
 
 **Stage 2 — sed substitution:**
 Replaces placeholders (`<PLACEHOLDER_NAME>`) with variable values from `config.mk`. Placeholders include:
-`<CAMUNDA_VERSION>`, `<YOUR_HOSTNAME>`, `<CAMUNDA_NAMESPACE>`, `<CAMUNDA_CLUSTER_SIZE>`, `<KEYCLOAK_*>`, `<IDENTITY_EXT_URL>`, `<ORCHESTRATION_EXT_URL>`, `<OPTIMIZE_EXT_URL>`, `<CONSOLE_EXT_URL>`, `<WEB_MODELER_EXT_URL>`, `<REPLY_EMAIL>`, `<POSTGRES_HOST>`, `<POSTGRES_KEYCLOAK_HOST>`, `<POSTGRES_KEYCLOAK_DB>`, `<POSTGRES_KEYCLOAK_USERNAME>`, `<POSTGRES_MODELER_HOST>`, `<POSTGRES_MODELER_DB>`, `<POSTGRES_MODELER_USERNAME>`, `<POSTGRES_IDENTITY_DB>`, `<POSTGRES_IDENTITY_USERNAME>`, `<POSTGRES_CAMUNDA_HOST>`, `<POSTGRES_CAMUNDA_DB>`, `<POSTGRES_CAMUNDA_USERNAME>`, `<OPENSEARCH_PROTOCOL>`, `<OPENSEARCH_HOST>`, `<OPENSEARCH_PORT>`, `<OPENSEARCH_USERNAME>`.
+`<CAMUNDA_VERSION>`, `<YOUR_HOSTNAME>`, `<CAMUNDA_NAMESPACE>`, `<CAMUNDA_CLUSTER_SIZE>`, `<KEYCLOAK_*>`, `<IDENTITY_EXT_URL>`, `<ORCHESTRATION_EXT_URL>`, `<OPTIMIZE_EXT_URL>`, `<CONSOLE_EXT_URL>`, `<WEB_MODELER_EXT_URL>`, `<REPLY_EMAIL>`, `<POSTGRES_HOST>`, `<POSTGRES_KEYCLOAK_HOST>`, `<POSTGRES_KEYCLOAK_DB>`, `<POSTGRES_KEYCLOAK_USERNAME>`, `<POSTGRES_MODELER_HOST>`, `<POSTGRES_MODELER_DB>`, `<POSTGRES_MODELER_USERNAME>`, `<POSTGRES_IDENTITY_DB>`, `<POSTGRES_IDENTITY_USERNAME>`, `<POSTGRES_CAMUNDA_HOST>`, `<POSTGRES_CAMUNDA_DB>`, `<POSTGRES_CAMUNDA_USERNAME>`, `<OPENSEARCH_PROTOCOL>`, `<OPENSEARCH_HOST>`, `<OPENSEARCH_PORT>`, `<OPENSEARCH_USERNAME>`, and for dual region `<CAMUNDA_NAMESPACE_0>`, `<CAMUNDA_NAMESPACE_1>`, `<ZONE>`, `<DNS_CHAIN_IP>`, `<BROKERS_PER_REGION>`, `<REPLICAS_PER_REGION>`.
 
 **Output:** `./camunda-values.yaml` (gitignored, regenerated each time).
 
@@ -87,7 +90,8 @@ Each recipe under `recipes/camunda/` contains:
 |--------|----------------------|--------------|
 | `basic-ingress-nginx-tls` | ingress-nginx-host, metrics, connectors-enabled, orchestration-elasticsearch, orchestration-topology, my-camunda-values | **Chart 15 / Camunda 8.10.** Minimal setup, no auth; ECK Elasticsearch backend (`recipes/elasticsearch`) |
 | `oidc-gateway-traefik-tls` | metrics, oidc, identity-enabled, hub-enabled, orchestration-opensearch, orchestration-oidc, optimize-opensearch, orchestration-topology, my-camunda-values | **Chart 15 / Camunda 8.10.** Traefik IngressRoute CRDs; external OpenSearch; CloudNativePG Postgres; Keycloak operator; Camunda Hub |
-| `oidc-gateway-traefik-tls-es` | enable-elasticsearch, metrics, oidc, identity-keycloak-internal-postgres, modeler-enabled, modeler-internal-postgres, orchestration-elasticsearch, orchestration-oidc, enable-multitenancy, my-camunda-values | Traefik IngressRoute CRDs; Elasticsearch; internal Postgres |
+| `oidc-gateway-traefik-tls-es` | enable-metrics, oidc, identity-enabled, hub-enabled, orchestration-elasticsearch, orchestration-oidc, optimize-elasticsearch, enable-multitenancy, orchestration-topology, orchestration-secret-store-file, my-camunda-values (in its `config.mk`) | **Chart 15 / Camunda 8.10.** Traefik IngressRoute CRDs; ECK Elasticsearch; CloudNativePG Postgres; Keycloak operator; Hub; Optimize |
+| `dual-region-es-oidc/region0`, `/region1` | oidc, (region 0: identity-enabled, hub-enabled, optimize-elasticsearch), orchestration-elasticsearch, orchestration-oidc, orchestration-dual-region-es, orchestration-dns-chain, orchestration-secret-store-file, enable-metrics, my-camunda-values | **Chart 15 / Camunda 8.10.** Zone-aware Orchestration Cluster over two clusters (8 brokers, RF 4), ES per region; region 0 combined release (Identity, Keycloak, Hub, Optimize), region 1 orchestration-only. Variables `*_0` / `*_1` and `DUAL_REGION_*`. See its README and `/create-gke-dual-region` |
 | `rdbms-postgres` | orchestration-rdbms-postgres, orchestration-topology, my-camunda-values | **Chart 15 / Camunda 8.10.** External Aurora/Postgres backend; no ingress |
 | `kind/hub` (in `recipes/kind/`) | ingress-nginx-host, identity-own-hostname, oidc-external-keycloak, connectors-enabled, orchestration-rdbms-postgres, hub-enabled, my-camunda-values | **Chart 15 / Camunda 8.10 alpha.** Local only: Camunda Hub, own Keycloak and PostgreSQL deployed in-cluster, Identity on its own hostname, minimal 1-broker Zeebe |
 | `rdbms-postgres-oidc` | ingress-nginx-host, oidc, identity-enabled, orchestration-rdbms-postgres, orchestration-oidc, orchestration-topology, my-camunda-values | **Chart 15 / Camunda 8.10.** External Postgres for Camunda RDBMS and Identity; Keycloak operator for OIDC (`recipes/postgres`, `recipes/keycloak`); nginx ingress with TLS |
@@ -106,14 +110,15 @@ Each recipe under `recipes/camunda/` contains:
 | `aws-vpc.mk` | AWS VPC utilities | Minimal |
 | `azure-aks.mk` | Azure AKS | `kube-aks`, `kube-agic`, `ingress-nginx-azure`, `connect-aks` |
 | `azure-common.mk` | Azure shared setup | `check-az` |
-| `google-gke.mk` | Google GKE | `kube-gke`, `node-pool`, `ssd-storageclass`, `scale-*`, `connect-gke` |
+| `google-gke.mk` | Google GKE | `kube-gke`, `node-pool`, `ssd-storageclass`, `default-ssd-storageclass`, `scale-*`, `connect-gke`. Optional `GCP_CLUSTER_DNS`, `GCP_CLUSTER_IPV4_CIDR`, `GCP_SERVICES_IPV4_CIDR` |
+| `google-dual-region-networking.mk` | Two GKE clusters as one network | `dual-region-networking`, `firewall-dual-region`, `configure-dns`, `test-dns`, `sync-elasticsearch-passwords`, `prometheus-lb`, `dual-region-status`, `clean-*` |
 | `google-common.mk` | Google shared setup | `check-gcloud` |
 | `ingress-nginx.mk` | Nginx ingress | `ingress-ip-from-service`, `ingress-hostname-from-service`, `annotate-ingress-proxy-buffer-size` |
 | `letsencrypt.mk` | Let's Encrypt / cert-manager | `cert-manager`, `letsencrypt-staging`, `letsencrypt-prod` (both honour `INGRESS_CLASS`), `request-certificate`, `delete-certificate`, `annotate-ingress-tls`, `get-cert-requests`, `get-cert-orders`, `cacerts-staging` |
 | `tls-self-signed-cert.mk` | Self-signed certs (OpenSSL) | `create-custom-certs`, `create-tls-secret`, `create-grpc-tls-secret` |
 | `tls-keystore.mk` | Java keystore/truststore | `create-keystore`, `create-truststore`, `create-keystore-secret` |
-| `metrics.mk` | Prometheus + Grafana | `metrics`, `create-grafana-credentials`, `port-grafana`, `port-prometheus` |
-| `keycloak.mk` | Keycloak admin | `create-keycloak-admin-user`, `keycloak-password` |
+| `metrics.mk` | Prometheus + Grafana | `metrics`, `update-metrics`, `create-grafana-credentials`, `port-grafana`, `port-prometheus`, `grafana-ingress-route` (Traefik, `/grafana`). `METRICS_VALUES` adds values files, `GRAFANA_LOAD_BALANCER=false` skips the public plain HTTP LB |
+| `keycloak.mk` | Keycloak admin | `create-keycloak-admin-user`, `keycloak-password`, `keycloak-add-redirect-uri` |
 
 ---
 
@@ -130,6 +135,8 @@ Each recipe under `recipes/camunda/` contains:
 | `orchestration-opensearch.yaml` | **Chart 15 only.** Zeebe secondary storage = external OpenSearch (`OPENSEARCH_*`) |
 | `orchestration-rdbms-postgres.yaml` | Zeebe secondary storage via JDBC (external Postgres); disables Elasticsearch |
 | `orchestration-oidc.yaml` | OIDC auth for Zeebe/Orchestration |
+| `orchestration-dual-region-es.yaml` | **Chart 15 only.** Zone-aware partitioning over two zones (= namespaces), initial contact points, membership tuning, Camunda exporters to both regions' Elasticsearch, legacy ES exporter to region 0 for Optimize. Owns `orchestration.env` |
+| `orchestration-dns-chain.yaml` | **Chart 15 only.** Broker `dnsConfig` through the `dns-chain` CoreDNS (`<DNS_CHAIN_IP>`), for cross-cluster names on GKE |
 | `orchestration-topology.yaml` | `orchestration.clusterSize`, `partitionCount` and `replicationFactor` from `CAMUNDA_CLUSTER_SIZE`, `CAMUNDA_PARTITION_COUNT` and `CAMUNDA_REPLICATION_FACTOR`. Not for dual-region (it has its own). Without it the chart defaults (3/3/3) apply |
 | `orchestration-secret-store-file.yaml` | 8.10 centralized secret resolution (`camunda.secrets.NAME`) with a file store. The chart mounts the Kubernetes Secret `camunda-process-secrets` at `/etc/camunda/secrets`. Create it with `recipes/camunda/secret-manager/file-store`, which turns every `SECRET_<NAME>` variable set in a `config.mk` or on the make command line into a secret `<NAME>`. Only one secret store per physical tenant |
 | `optimize-opensearch.yaml` | **Chart 15 only.** Optimize connected to external OpenSearch (`OPENSEARCH_*`) |
@@ -143,7 +150,7 @@ Each recipe under `recipes/camunda/` contains:
 | `modeler-internal-postgres.yaml` | Web Modeler uses bundled Postgres |
 | `modeler-external-postgres.yaml` | Web Modeler uses external Postgres (`<POSTGRES_MODELER_HOST>`) |
 | `enable-identity-postgres.yaml` | Internal Postgres for Identity |
-| `hub-enabled.yaml` | **Chart 15 only.** `camundaHub.enabled` with its external PostgreSQL database (`<POSTGRES_MODELER_*>`); replaces Web Modeler + Console |
+| `hub-enabled.yaml` | **Chart 15 only.** `camundaHub.enabled` with its external PostgreSQL database (`<POSTGRES_MODELER_*>`) and the Hub test feature (`camunda.hub.feature.test-mode-enabled`); replaces Web Modeler + Console |
 | `oidc-external-keycloak.yaml` | **Chart 15 only.** OIDC against an external Keycloak, Identity on external Postgres, orchestration and Connectors OIDC; replaces `oidc.yaml` + `identity-keycloak-*.yaml` |
 | `ingress-nginx-host.yaml` | **Chart 15 only.** nginx ingress with TLS using `global.host` (`global.ingress.host` was removed); replaces `enable-ingress-nginx.yaml` |
 | `identity-own-hostname.yaml` | **Chart 15 only.** Management Identity on `identity.<YOUR_HOSTNAME>` plus a redirect for Hub's Identity link, via `global.extraManifests` |

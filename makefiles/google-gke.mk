@@ -9,15 +9,27 @@ else
   SPOT_FLAG :=
 endif
 
+# With a region (e.g. us-central1) GKE creates a regional cluster: nodes in every zone of the region, and
+# --num-nodes, --min-nodes and --max-nodes count per zone. With a zone (e.g. us-east4-a) it is a zonal cluster.
+GCP_NUM_NODES ?= 1
+# Cluster DNS provider: empty keeps the GKE default. Dual-region setups set kubedns, because their dns-chain CoreDNS forwards to the kube-dns service.
+GCP_CLUSTER_DNS ?=
+# Pod and service CIDRs: empty lets GKE pick them. Dual-region setups set non-overlapping ranges explicitly.
+GCP_CLUSTER_IPV4_CIDR ?=
+GCP_SERVICES_IPV4_CIDR ?=
+
 .PHONY: kube-gke
 kube-gke:
-	@echo "Creating GKE cluster '$(DEPLOYMENT_NAME)' (spot=$(GCP_USE_SPOT), machine=$(GCP_MACHINE_TYPE), min=$(MIN_SIZE), max=$(MAX_SIZE))"
+	@echo "Creating GKE cluster '$(DEPLOYMENT_NAME)' (spot=$(GCP_USE_SPOT), machine=$(GCP_MACHINE_TYPE), nodes=$(GCP_NUM_NODES), min=$(MIN_SIZE), max=$(MAX_SIZE))"
 	gcloud config set project $(GCP_PROJECT)
 	gcloud container clusters create $(DEPLOYMENT_NAME) \
 	  --region $(GCP_REGION) \
-	  --num-nodes=1 \
+	  --num-nodes=$(GCP_NUM_NODES) \
 	  --enable-autoscaling --min-nodes=$(MIN_SIZE) --max-nodes=$(MAX_SIZE) \
 	  --enable-ip-alias \
+	  $(if $(GCP_CLUSTER_DNS),--cluster-dns=$(GCP_CLUSTER_DNS)) \
+	  $(if $(GCP_CLUSTER_IPV4_CIDR),--cluster-ipv4-cidr=$(GCP_CLUSTER_IPV4_CIDR)) \
+	  $(if $(GCP_SERVICES_IPV4_CIDR),--services-ipv4-cidr=$(GCP_SERVICES_IPV4_CIDR)) \
 	  --machine-type=$(GCP_MACHINE_TYPE) \
 	  --disk-type "pd-ssd" \
 	  $(SPOT_FLAG) \
@@ -32,6 +44,16 @@ kube-gke:
 .PHONY: ssd-storageclass
 ssd-storageclass:
 	kubectl apply -f $(root)/recipes/google/include/ssd-storageclass-gke.yaml
+
+# Makes the built-in GKE premium-rwo class (pd-ssd, CSI driver, WaitForFirstConsumer) the cluster default,
+# so every PVC that does not name a class (Zeebe, Elasticsearch, PostgreSQL) gets an SSD. Recipes stay
+# cloud agnostic because they keep using the default class.
+.PHONY: default-ssd-storageclass
+default-ssd-storageclass:
+	for sc in $$(kubectl get storageclass -o name); do \
+	  kubectl patch $$sc -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'; done
+	kubectl patch storageclass premium-rwo -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+	kubectl get storageclass
 
 .PHONY: kube
 kube: kube-gke

@@ -1,0 +1,85 @@
+# Small CoreDNS that chains DNS between two clusters (see makefiles/google-dual-region-networking.mk).
+#
+# Why not kube-dns stubDomains: GKE's managed kube-dns (CoreDNS based) renders a stub domain as a `forward` inside
+# the same server block as `kubernetes cluster.local`, so a stub domain under cluster.local is never reached and
+# the remote names return NXDOMAIN. This CoreDNS has its own server block for the remote namespace instead.
+#
+# Only pods that resolve the other region's names point at it (dnsPolicy: None + dnsConfig), for example the
+# Zeebe brokers. Everything else keeps using kube-dns. Placeholders are filled in by `make deploy-dns-chain`.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dns-chain
+  namespace: kube-system
+data:
+  Corefile: |
+    <REMOTE_NAMESPACE>.svc.cluster.local:53 {
+      errors
+      cache 30
+      forward . <REMOTE_DNS_LB_IP>
+    }
+    .:53 {
+      errors
+      health :8080
+      ready :8181
+      cache 30
+      forward . <LOCAL_KUBE_DNS_IP>
+      loop
+      reload
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dns-chain
+  namespace: kube-system
+  labels: {app: dns-chain}
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: dns-chain}
+  template:
+    metadata:
+      labels: {app: dns-chain}
+    spec:
+      priorityClassName: system-cluster-critical
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: topology.kubernetes.io/zone
+                labelSelector:
+                  matchLabels: {app: dns-chain}
+      containers:
+        - name: coredns
+          image: <COREDNS_IMAGE>
+          args: ["-conf", "/etc/coredns/Corefile"]
+          ports:
+            - {name: dns, containerPort: 53, protocol: UDP}
+            - {name: dns-tcp, containerPort: 53, protocol: TCP}
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {memory: 256Mi}
+          livenessProbe:
+            httpGet: {path: /health, port: 8080}
+          readinessProbe:
+            httpGet: {path: /ready, port: 8181}
+          volumeMounts:
+            - {name: config, mountPath: /etc/coredns}
+      volumes:
+        - name: config
+          configMap: {name: dns-chain}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dns-chain
+  namespace: kube-system
+spec:
+  # Fixed IP from the cluster's service range, so Helm values can reference it before the cluster exists
+  clusterIP: <DNS_CHAIN_IP>
+  selector: {app: dns-chain}
+  ports:
+    - {name: dns, port: 53, protocol: UDP}
+    - {name: dns-tcp, port: 53, protocol: TCP}

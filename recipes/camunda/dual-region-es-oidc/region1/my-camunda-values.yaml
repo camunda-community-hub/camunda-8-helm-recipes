@@ -1,0 +1,41 @@
+# Region 1 overrides, merged last. Note that arrays (for example orchestration.env) are replaced, not merged.
+# Region 1 runs an orchestration release: only the region 1 zone of the Orchestration Cluster.
+# https://docs.camunda.io/docs/self-managed/deployment/helm/install/topology/orchestration-release/
+
+global:
+  topology:
+    mode: orchestration
+  identity:
+    # Management Identity runs in region 0. ClusterIPs are not reachable across the clusters, so use the public URL.
+    service:
+      url: <IDENTITY_EXT_URL>/management
+    auth:
+      # Keycloak runs in region 0, so the backend URLs are the public ones too
+      issuerBackendUrl: <KEYCLOAK_EXT_URL>/auth/realms/<KEYCLOAK_REALM>
+      tokenUrl: <KEYCLOAK_EXT_URL>/auth/realms/<KEYCLOAK_REALM>/protocol/openid-connect/token
+      jwksUrl: <KEYCLOAK_EXT_URL>/auth/realms/<KEYCLOAK_REALM>/protocol/openid-connect/certs
+
+identity:
+  enabled: false
+
+optimize:
+  enabled: false
+
+# Connectors run in region 0 only, so inbound connectors do not process events twice
+connectors:
+  enabled: false
+
+orchestration:
+  security:
+    initialization:
+      # Lets the "connectors" client deploy and read resources, so the benchmark tool and REST smoke tests (which
+      # authenticate as "connectors") can deploy their processes. Same grant as oidc-gateway-traefik-tls-es.
+      # Identical in both regions, because both regions' brokers belong to the same cluster.
+      authorizations:
+        - ownerType: ROLE
+          ownerId: connectors
+          resourceType: RESOURCE
+          resourceId: "*"
+          permissions:
+            - CREATE
+            - READ

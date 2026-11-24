@@ -1,6 +1,9 @@
 CAMUNDA_RECIPES := \
   basic-ingress-nginx-tls \
   oidc-gateway-traefik-tls \
+  oidc-gateway-traefik-tls-es \
+  dual-region-es-oidc/region0 \
+  dual-region-es-oidc/region1 \
   rdbms-postgres \
   rdbms-postgres-oidc \
   ../kind/hub

@@ -1,0 +1,26 @@
+# Exposes this cluster's kube-dns on a private IP so the other region's dns-chain CoreDNS can forward
+# queries for this cluster's namespaces to it (DNS chaining, see makefiles/google-dual-region-networking.mk).
+#
+# Internal passthrough load balancer with global access: the IP is only reachable from inside the VPC,
+# but from every region of it, so the other region's cluster can use it.
+# UDP only: the dns-chain CoreDNS of the other cluster forwards plain DNS queries to it.
+apiVersion: v1
+kind: Service
+metadata:
+  name: kube-dns-lb
+  namespace: kube-system
+  labels:
+    k8s-app: kube-dns
+  annotations:
+    networking.gke.io/load-balancer-type: "Internal"
+    networking.gke.io/internal-load-balancer-allow-global-access: "true"
+spec:
+  type: LoadBalancer
+  ports:
+    - name: dns
+      port: 53
+      protocol: UDP
+      targetPort: 53
+  selector:
+    k8s-app: kube-dns
+  sessionAffinity: None

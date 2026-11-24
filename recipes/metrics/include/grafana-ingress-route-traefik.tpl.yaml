@@ -1,0 +1,20 @@
+# Grafana under https://<YOUR_HOSTNAME>/grafana through Traefik.
+# Grafana must serve from the sub path (grafana.ini server.root_url and serve_from_sub_path).
+# The TLS secret lives in the metrics namespace, because Traefik does not read secrets across namespaces by default.
+# Placeholders are substituted by `make grafana-ingress-route` (makefiles/metrics.mk).
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: grafana
+  namespace: <METRICS_NAMESPACE>
+spec:
+  entryPoints:
+    - websecure
+  tls:
+    secretName: <GRAFANA_TLS_SECRET_NAME>
+  routes:
+    - match: Host(`<YOUR_HOSTNAME>`) && PathPrefix(`/grafana`)
+      kind: Rule
+      services:
+        - name: metrics-grafana
+          port: 80

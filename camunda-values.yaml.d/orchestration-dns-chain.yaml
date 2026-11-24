@@ -1,0 +1,17 @@
+# Zeebe brokers resolve through the dns-chain CoreDNS (fixed ClusterIP <DNS_CHAIN_IP>), which forwards the other
+# region's namespace to the other cluster and everything else to the local kube-dns.
+# Needed on GKE, where kube-dns stubDomains cannot forward names under cluster.local. Created by
+# `make -C recipes/google/gke-dual-region` (deploy-dns-chain). Only the brokers resolve remote names: contact points,
+# broker advertised hosts and the remote Elasticsearch exporter.
+orchestration:
+  dnsPolicy: "None"
+  dnsConfig:
+    nameservers:
+      - <DNS_CHAIN_IP>
+    searches:
+      - <CAMUNDA_NAMESPACE>.svc.cluster.local
+      - svc.cluster.local
+      - cluster.local
+    options:
+      - name: ndots
+        value: "5"
