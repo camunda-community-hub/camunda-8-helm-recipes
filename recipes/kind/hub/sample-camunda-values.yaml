@@ -218,6 +218,14 @@ camundaHub:
               mail:
                 from-address: 
                 from-name: Camunda Platform
+      # Test mode (Test tab in the BPMN editor). The default is already true for the Kubernetes distribution;
+      # set explicitly so it is visible and easy to turn off. Needs an 8.10+ Orchestration Cluster.
+      - file: hub-test-mode.yaml
+        content: |
+          camunda:
+            hub:
+              feature:
+                test-mode-enabled: true
     env:
       # The chart only sets the Pusher client path and TLS flag when global.ingress.enabled is true.
       # Without a chart-managed Ingress (Traefik IngressRoute) they must be set here.

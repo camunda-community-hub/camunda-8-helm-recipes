@@ -1,0 +1,231 @@
+# OIDC authentication via Keycloak (chart 15 / Camunda 8.10).
+# Centralises the OIDC settings shared by all components: authentication method, issuer URLs,
+# client secrets and redirect URLs, and the Identity to Keycloak admin connection.
+#
+# Keycloak is not bundled in chart 15. Run it with recipes/keycloak (Keycloak operator): the service is
+# keycloak-service:18080, served under /auth, and recipes/keycloak creates the keycloak-bootstrap-admin secret.
+# Management Identity creates the camunda-platform realm, the OIDC clients and the first user at startup.
+#
+# Combine with identity-enabled.yaml.
+
+# Region 1 overrides, merged last. Note that arrays (for example orchestration.env) are replaced, not merged.
+# Region 1 runs an orchestration release: only the region 1 zone of the Orchestration Cluster.
+# https://docs.camunda.io/docs/self-managed/deployment/helm/install/topology/orchestration-release/
+global:
+  security:
+    authentication:
+      method: oidc
+  identity:
+    auth:
+      enabled: true
+      type: KEYCLOAK
+      publicIssuerUrl: https://region0.example.com/auth/realms/camunda-platform
+      # Keycloak runs in region 0, so the backend URLs are the public ones too
+      issuerBackendUrl: https://region0.example.com/auth/realms/camunda-platform
+      authUrl: https://region0.example.com/auth/realms/camunda-platform/protocol/openid-connect/auth
+      tokenUrl: https://region0.example.com/auth/realms/camunda-platform/protocol/openid-connect/token
+      jwksUrl: https://region0.example.com/auth/realms/camunda-platform/protocol/openid-connect/certs
+      identity:
+        redirectUrl: https://region0.example.com/management
+      orchestration:
+        secret:
+          existingSecret: camunda-credentials
+          existingSecretKey: identity-orchestration-client-token
+        redirectUrl: https://region1.example.com/orchestration
+      # The secret is required by Identity even when Optimize is disabled.
+      # redirectUrl is harmless when Optimize is disabled.
+      optimize:
+        secret:
+          existingSecret: camunda-credentials
+          existingSecretKey: identity-optimize-client-token
+        redirectUrl: https://region0.example.com/optimize
+      camundaHub:
+        redirectUrl: https://region0.example.com/hub
+    keycloak:
+      url:
+        protocol: http
+        host: keycloak-service
+        port: "18080"
+      contextPath: /auth
+      realm: /realms/camunda-platform
+      auth:
+        adminUser: temp-admin
+        secret:
+          existingSecret: keycloak-bootstrap-admin
+          existingSecretKey: password
+    # Management Identity runs in region 0. ClusterIPs are not reachable across the clusters, so use the public URL.
+    service:
+      url: https://region0.example.com/management
+  topology:
+    mode: orchestration
+# Connectors run in region 0 only, so inbound connectors do not process events twice
+connectors:
+  security:
+    authentication:
+      method: oidc
+      oidc:
+        secret:
+          existingSecret: camunda-credentials
+          existingSecretKey: identity-connectors-client-token
+  enabled: false
+# Zeebe brokers resolve through the dns-chain CoreDNS (fixed ClusterIP 10.112.0.53), which forwards the other
+# region's namespace to the other cluster and everything else to the local kube-dns.
+# Needed on GKE, where kube-dns stubDomains cannot forward names under cluster.local. Created by
+# `make -C recipes/google/gke-dual-region` (deploy-dns-chain). Only the brokers resolve remote names: contact points,
+# broker advertised hosts and the remote Elasticsearch exporter.
+orchestration:
+  data:
+    secondaryStorage:
+      type: elasticsearch
+      elasticsearch:
+        url: http://elasticsearch-es-http:9200
+        auth:
+          username: elastic
+          secret:
+            existingSecret: elasticsearch-es-elastic-user
+            existingSecretKey: elastic
+  contextPath: /orchestration
+  security:
+    authentication:
+      oidc:
+        secret:
+          existingSecret: "camunda-credentials"
+          existingSecretKey: "identity-orchestration-client-token"
+        redirectUrl: https://region1.example.com/orchestration
+    initialization:
+      # Lets the "connectors" client deploy and read resources, so the benchmark tool and REST smoke tests (which
+      # authenticate as "connectors") can deploy their processes. Same grant as oidc-gateway-traefik-tls-es.
+      # Identical in both regions, because both regions' brokers belong to the same cluster.
+      authorizations:
+        - ownerType: ROLE
+          ownerId: connectors
+          resourceType: RESOURCE
+          resourceId: "*"
+          permissions:
+            - CREATE
+            - READ
+  # clusterSize and replicationFactor are derived by the chart from the zones list. Do not set them.
+  partitionCount: "8"
+  partitioning:
+    scheme: zone-aware
+    zone: region1
+    # Identical list in both regions. Region 0 has the higher priority, so it holds most partition leaders.
+    zones:
+      - name: region0
+        numberOfBrokers: 4
+        numberOfReplicas: 2
+        priority: 100
+      - name: region1
+        numberOfBrokers: 4
+        numberOfReplicas: 2
+        priority: 90
+  # Zone awareness places partition replicas between the regions. Spreading the broker pods over the
+  # availability zones inside each region is a separate, Kubernetes level setting.
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/component: zeebe-broker
+          app.kubernetes.io/instance: camunda
+  # The exporters are configured explicitly through env below: one Camunda exporter per region, and the
+  # legacy Elasticsearch exporter that Optimize imports from.
+  exporters:
+    zeebe:
+      enabled: false
+  extraConfiguration:
+    - file: orchestration-camunda-exporter.yaml
+      content: |
+        camunda:
+          data:
+            secondary-storage:
+              autoconfigure-camunda-exporter: false
+  env:
+    # One headless Zeebe service per zone is enough, gossip finds the other brokers
+    - name: CAMUNDA_CLUSTER_INITIALCONTACTPOINTS
+      value: camunda-zeebe-region0.region0.svc.cluster.local:26502,camunda-zeebe-region1.region1.svc.cluster.local:26502
+    # Cross-region membership tuning, from the Camunda EKS dual-region reference values
+    - name: CAMUNDA_CLUSTER_MEMBERSHIP_PROBETIMEOUT
+      value: 1000ms
+    - name: CAMUNDA_CLUSTER_MEMBERSHIP_PROBEINTERVAL
+      value: 2s
+    - name: CAMUNDA_CLUSTER_MEMBERSHIP_FAILURETIMEOUT
+      value: 10000ms
+    - name: CAMUNDA_CLUSTER_RAFT_SNAPSHOTREQUESTTIMEOUT
+      value: 10s
+    - name: CAMUNDA_CLUSTER_COMPRESSIONALGORITHM
+      value: GZIP
+    # Region 0 Elasticsearch. Headless service: pod IPs are routable across the clusters, ClusterIPs are not.
+    - name: CAMUNDA_DATA_EXPORTERS_CAMUNDAREGION0_CLASSNAME
+      value: io.camunda.exporter.CamundaExporter
+    - name: CAMUNDA_DATA_EXPORTERS_CAMUNDAREGION0_ARGS_CONNECT_URL
+      value: http://elasticsearch-es-masters.region0.svc.cluster.local:9200
+    - name: CAMUNDA_DATA_EXPORTERS_CAMUNDAREGION0_ARGS_CONNECT_USERNAME
+      value: elastic
+    - name: CAMUNDA_DATA_EXPORTERS_CAMUNDAREGION0_ARGS_CONNECT_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: elasticsearch-es-password-region-0
+          key: elastic
+    # Region 1 Elasticsearch
+    - name: CAMUNDA_DATA_EXPORTERS_CAMUNDAREGION1_CLASSNAME
+      value: io.camunda.exporter.CamundaExporter
+    - name: CAMUNDA_DATA_EXPORTERS_CAMUNDAREGION1_ARGS_CONNECT_URL
+      value: http://elasticsearch-es-masters.region1.svc.cluster.local:9200
+    - name: CAMUNDA_DATA_EXPORTERS_CAMUNDAREGION1_ARGS_CONNECT_USERNAME
+      value: elastic
+    - name: CAMUNDA_DATA_EXPORTERS_CAMUNDAREGION1_ARGS_CONNECT_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: elasticsearch-es-password-region-1
+          key: elastic
+    # Legacy Elasticsearch exporter for Optimize, which runs in region 0 and reads the region 0 Elasticsearch.
+    # Each broker exports only the partitions it leads, so it runs on every broker in both regions.
+    - name: CAMUNDA_DATA_EXPORTERS_OPTIMIZE_CLASSNAME
+      value: io.camunda.zeebe.exporter.ElasticsearchExporter
+    - name: CAMUNDA_DATA_EXPORTERS_OPTIMIZE_ARGS_URL
+      value: http://elasticsearch-es-masters.region0.svc.cluster.local:9200
+    - name: CAMUNDA_DATA_EXPORTERS_OPTIMIZE_ARGS_AUTHENTICATION_USERNAME
+      value: elastic
+    - name: CAMUNDA_DATA_EXPORTERS_OPTIMIZE_ARGS_AUTHENTICATION_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: elasticsearch-es-password-region-0
+          key: elastic
+    - name: CAMUNDA_DATA_EXPORTERS_OPTIMIZE_ARGS_INDEX_PREFIX
+      value: zeebe-record
+  resources:
+    requests:
+      cpu: "1"
+      memory: 4Gi
+    limits:
+      cpu: "2"
+      memory: 6Gi
+  dnsPolicy: "None"
+  dnsConfig:
+    nameservers:
+      - 10.112.0.53
+    searches:
+      - region1.svc.cluster.local
+      - svc.cluster.local
+      - cluster.local
+    options:
+      - name: ndots
+        value: "5"
+  # Centralized secret resolution (8.10): processes reference camunda.secrets.NAME. The chart mounts the
+  # Kubernetes Secret below read-only at /etc/camunda/secrets, one file per key. Create it with
+  # recipes/camunda/secret-manager/file-store. Only one secret store is allowed per physical tenant.
+  secretStore:
+    file:
+      default:
+        secret:
+          existingSecret: camunda-process-secrets
+prometheusServiceMonitor:
+  enabled: true
+  labels:
+    release: metrics
+identity:
+  enabled: false
+optimize:
+  enabled: false

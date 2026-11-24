@@ -1,10 +1,18 @@
+# Extra kube-prometheus-stack values files, applied after prometheus-operator-values.yml (for example a remote write
+# target or Grafana served from a sub path)
+METRICS_VALUES ?=
+# false skips the public, plain HTTP Grafana load balancer (for example when Grafana is routed through an ingress)
+GRAFANA_LOAD_BALANCER ?= true
+
 .PHONY: metrics
 metrics: create-grafana-credentials
 	helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 	helm repo add stable https://charts.helm.sh/stable
 	helm repo update prometheus-community stable
-	helm install metrics prometheus-community/kube-prometheus-stack --wait -f $(root)/recipes/metrics/prometheus-operator-values.yml --set prometheusOperator.tlsProxy.enabled=false --namespace default
+	helm install metrics prometheus-community/kube-prometheus-stack --wait -f $(root)/recipes/metrics/prometheus-operator-values.yml $(addprefix -f ,$(METRICS_VALUES)) --set prometheusOperator.tlsProxy.enabled=false --namespace default
+ifeq ($(GRAFANA_LOAD_BALANCER),true)
 	kubectl apply -f $(root)/recipes/metrics/grafana-load-balancer.yml -n default
+endif
 	@${MAKE} grafana-password
 
 .PHONY: grafana-password
@@ -20,7 +28,22 @@ grafana-password:
 
 .PHONY: update-metrics
 update-metrics:
-	helm upgrade metrics prometheus-community/kube-prometheus-stack --wait -f $(root)/recipes/metrics/prometheus-operator-values.yml --set prometheusOperator.tlsProxy.enabled=false --namespace default
+	helm upgrade metrics prometheus-community/kube-prometheus-stack --wait -f $(root)/recipes/metrics/prometheus-operator-values.yml $(addprefix -f ,$(METRICS_VALUES)) --set prometheusOperator.tlsProxy.enabled=false --namespace default
+
+# Routes https://HOST_NAME/grafana to Grafana through Traefik. Needs the GRAFANA_TLS_SECRET_NAME secret in the default
+# namespace (for example from request-certificate) and Grafana values that serve it from /grafana.
+GRAFANA_TLS_SECRET_NAME ?= grafana-tls
+
+.PHONY: grafana-ingress-route
+grafana-ingress-route:
+	sed -e "s|<YOUR_HOSTNAME>|$(HOST_NAME)|g" \
+	    -e "s|<METRICS_NAMESPACE>|default|g" \
+	    -e "s|<GRAFANA_TLS_SECRET_NAME>|$(GRAFANA_TLS_SECRET_NAME)|g" \
+	    $(root)/recipes/metrics/include/grafana-ingress-route-traefik.tpl.yaml | kubectl apply -f -
+
+.PHONY: clean-grafana-ingress-route
+clean-grafana-ingress-route:
+	-kubectl delete ingressroute grafana -n default
 
 .PHONY: clean-metrics
 clean-metrics:

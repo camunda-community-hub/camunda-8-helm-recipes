@@ -8,8 +8,9 @@ CAMUNDA_NAMESPACE ?= camunda
 CAMUNDA_RELEASE_NAME ?= camunda
 
 CAMUNDA_CHART ?= camunda/camunda-platform
-CAMUNDA_HELM_CHART_VERSION ?= 15.1.0
-CAMUNDA_VERSION ?= 8.10.0
+CAMUNDA_HELM_CHART_VERSION ?= 15.4.3
+# Informational only for chart 15: image versions come from the chart defaults (15.4.3 ships 8.10.5 to 8.10.10).
+CAMUNDA_VERSION ?= 8.10.x
 
 # Prerequisites (chart 15 does not bundle Keycloak or its database):
 #   recipes/postgres   CloudNativePG, needed for the Keycloak database (pg-keycloak)

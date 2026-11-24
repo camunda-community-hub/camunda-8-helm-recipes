@@ -1,0 +1,110 @@
+# Dual-region Orchestration Cluster with Elasticsearch and zone-aware brokers (chart 15 / Camunda 8.10).
+# https://docs.camunda.io/docs/self-managed/concepts/multi-region/dual-region/
+# https://docs.camunda.io/docs/self-managed/deployment/helm/configure/multi-region-zone-awareness/
+#
+# Used by both regional releases of recipes/camunda/dual-region-es-oidc. Each region is one zone, named after
+# its namespace (<CAMUNDA_NAMESPACE_0>, <CAMUNDA_NAMESPACE_1>). <ZONE> is the local one.
+# Needs cross-cluster DNS and pod routing (for GKE: recipes/google/gke-dual-region) and an ECK Elasticsearch in
+# each region (recipes/elasticsearch), plus the elasticsearch-es-password-region-0/-1 secrets in both namespaces
+# (make sync-elasticsearch-passwords).
+#
+# IMPORTANT: orchestration.env is a list and yq replaces lists, so every broker env variable lives in this file.
+orchestration:
+  # clusterSize and replicationFactor are derived by the chart from the zones list. Do not set them.
+  partitionCount: "<CAMUNDA_PARTITION_COUNT>"
+  partitioning:
+    scheme: zone-aware
+    zone: <ZONE>
+    # Identical list in both regions. Region 0 has the higher priority, so it holds most partition leaders.
+    zones:
+      - name: <CAMUNDA_NAMESPACE_0>
+        numberOfBrokers: <BROKERS_PER_REGION>
+        numberOfReplicas: <REPLICAS_PER_REGION>
+        priority: 100
+      - name: <CAMUNDA_NAMESPACE_1>
+        numberOfBrokers: <BROKERS_PER_REGION>
+        numberOfReplicas: <REPLICAS_PER_REGION>
+        priority: 90
+  # Zone awareness places partition replicas between the regions. Spreading the broker pods over the
+  # availability zones inside each region is a separate, Kubernetes level setting.
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/component: zeebe-broker
+          app.kubernetes.io/instance: camunda
+  # The exporters are configured explicitly through env below: one Camunda exporter per region, and the
+  # legacy Elasticsearch exporter that Optimize imports from.
+  exporters:
+    zeebe:
+      enabled: false
+  extraConfiguration:
+    - file: orchestration-camunda-exporter.yaml
+      content: |
+        camunda:
+          data:
+            secondary-storage:
+              autoconfigure-camunda-exporter: false
+  env:
+    # One headless Zeebe service per zone is enough, gossip finds the other brokers
+    - name: CAMUNDA_CLUSTER_INITIALCONTACTPOINTS
+      value: camunda-zeebe-<CAMUNDA_NAMESPACE_0>.<CAMUNDA_NAMESPACE_0>.svc.cluster.local:26502,camunda-zeebe-<CAMUNDA_NAMESPACE_1>.<CAMUNDA_NAMESPACE_1>.svc.cluster.local:26502
+    # Cross-region membership tuning, from the Camunda EKS dual-region reference values
+    - name: CAMUNDA_CLUSTER_MEMBERSHIP_PROBETIMEOUT
+      value: 1000ms
+    - name: CAMUNDA_CLUSTER_MEMBERSHIP_PROBEINTERVAL
+      value: 2s
+    - name: CAMUNDA_CLUSTER_MEMBERSHIP_FAILURETIMEOUT
+      value: 10000ms
+    - name: CAMUNDA_CLUSTER_RAFT_SNAPSHOTREQUESTTIMEOUT
+      value: 10s
+    - name: CAMUNDA_CLUSTER_COMPRESSIONALGORITHM
+      value: GZIP
+    # Region 0 Elasticsearch. Headless service: pod IPs are routable across the clusters, ClusterIPs are not.
+    - name: CAMUNDA_DATA_EXPORTERS_CAMUNDAREGION0_CLASSNAME
+      value: io.camunda.exporter.CamundaExporter
+    - name: CAMUNDA_DATA_EXPORTERS_CAMUNDAREGION0_ARGS_CONNECT_URL
+      value: http://elasticsearch-es-masters.<CAMUNDA_NAMESPACE_0>.svc.cluster.local:9200
+    - name: CAMUNDA_DATA_EXPORTERS_CAMUNDAREGION0_ARGS_CONNECT_USERNAME
+      value: elastic
+    - name: CAMUNDA_DATA_EXPORTERS_CAMUNDAREGION0_ARGS_CONNECT_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: elasticsearch-es-password-region-0
+          key: elastic
+    # Region 1 Elasticsearch
+    - name: CAMUNDA_DATA_EXPORTERS_CAMUNDAREGION1_CLASSNAME
+      value: io.camunda.exporter.CamundaExporter
+    - name: CAMUNDA_DATA_EXPORTERS_CAMUNDAREGION1_ARGS_CONNECT_URL
+      value: http://elasticsearch-es-masters.<CAMUNDA_NAMESPACE_1>.svc.cluster.local:9200
+    - name: CAMUNDA_DATA_EXPORTERS_CAMUNDAREGION1_ARGS_CONNECT_USERNAME
+      value: elastic
+    - name: CAMUNDA_DATA_EXPORTERS_CAMUNDAREGION1_ARGS_CONNECT_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: elasticsearch-es-password-region-1
+          key: elastic
+    # Legacy Elasticsearch exporter for Optimize, which runs in region 0 and reads the region 0 Elasticsearch.
+    # Each broker exports only the partitions it leads, so it runs on every broker in both regions.
+    - name: CAMUNDA_DATA_EXPORTERS_OPTIMIZE_CLASSNAME
+      value: io.camunda.zeebe.exporter.ElasticsearchExporter
+    - name: CAMUNDA_DATA_EXPORTERS_OPTIMIZE_ARGS_URL
+      value: http://elasticsearch-es-masters.<CAMUNDA_NAMESPACE_0>.svc.cluster.local:9200
+    - name: CAMUNDA_DATA_EXPORTERS_OPTIMIZE_ARGS_AUTHENTICATION_USERNAME
+      value: elastic
+    - name: CAMUNDA_DATA_EXPORTERS_OPTIMIZE_ARGS_AUTHENTICATION_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: elasticsearch-es-password-region-0
+          key: elastic
+    - name: CAMUNDA_DATA_EXPORTERS_OPTIMIZE_ARGS_INDEX_PREFIX
+      value: zeebe-record
+  resources:
+    requests:
+      cpu: "1"
+      memory: 4Gi
+    limits:
+      cpu: "2"
+      memory: 6Gi

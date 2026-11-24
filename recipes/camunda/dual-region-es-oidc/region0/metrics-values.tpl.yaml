@@ -1,0 +1,17 @@
+# kube-prometheus-stack overrides for region 0, on top of recipes/metrics/prometheus-operator-values.yml.
+# Region 0 runs the Grafana for both regions. Its Prometheus also receives region 1's metrics by remote write
+# (enableRemoteWriteReceiver is already on in the base values), so the Zeebe dashboard can show both regions as one
+# cluster: select both namespaces (= regions) in the namespace variable.
+# Placeholders are substituted by `make metrics-values.yaml`.
+
+grafana:
+  grafana.ini:
+    server:
+      root_url: https://<YOUR_HOSTNAME>/grafana
+      serve_from_sub_path: true
+
+prometheus:
+  prometheusSpec:
+    # Only added to data sent to other Prometheus servers. Local series already have namespace = region.
+    externalLabels:
+      region: <ZONE>

@@ -1,0 +1,31 @@
+# Region 0 overrides, merged last. Note that arrays (for example orchestration.env) are replaced, not merged.
+# Region 0 runs a combined release: the region 0 zone of the Orchestration Cluster, Connectors, Management
+# Identity, Camunda Hub and Optimize. Hub, Identity and Optimize are single region and are not part of the
+# dual-region failover (https://docs.camunda.io/docs/self-managed/concepts/multi-region/dual-region/#management-platform-and-orchestration-cluster).
+
+optimize:
+  migration:
+    enabled: false
+  # Optimize imports one zeebe-record stream per partition and does not follow orchestration.partitionCount: the chart
+  # takes it from the deprecated optimize.partitionCount (default 3) unless it is set here. With fewer partitions than
+  # the cluster, Optimize silently misses every process instance on the remaining partitions.
+  extraConfiguration:
+    - file: optimize-partitions.yaml
+      content: |
+        zeebe:
+          partitionCount: <CAMUNDA_PARTITION_COUNT>
+
+orchestration:
+  security:
+    initialization:
+      # Lets the "connectors" client deploy and read resources, so the benchmark tool and REST smoke tests (which
+      # authenticate as "connectors") can deploy their processes. Same grant as oidc-gateway-traefik-tls-es.
+      # Identical in both regions, because both regions' brokers belong to the same cluster.
+      authorizations:
+        - ownerType: ROLE
+          ownerId: connectors
+          resourceType: RESOURCE
+          resourceId: "*"
+          permissions:
+            - CREATE
+            - READ

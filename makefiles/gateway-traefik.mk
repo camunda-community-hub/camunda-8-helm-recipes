@@ -47,7 +47,11 @@ traefik-dashboard:
 # IngressRoute management
 # ---------------------------------------------------------------------------
 
-ingress-routes.yaml: $(root)/recipes/gateway-traefik/include/ingress-routes.tpl.yaml
+# Recipes that run only part of Camunda can point this at another template, for example
+# ingress-routes-orchestration.tpl.yaml for an orchestration-only release.
+INGRESS_ROUTES_TEMPLATE ?= $(root)/recipes/gateway-traefik/include/ingress-routes.tpl.yaml
+
+ingress-routes.yaml: $(INGRESS_ROUTES_TEMPLATE)
 	@echo "Generating ingress-routes.yaml from template ..."
 	sed "s|<YOUR_HOSTNAME>|$(HOST_NAME)|g; \
 	     s|<CAMUNDA_NAMESPACE>|$(CAMUNDA_NAMESPACE)|g; \
